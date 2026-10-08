@@ -50,6 +50,19 @@ function MessageTicks({ status }) {
   );
 }
 
+function AvatarPhoto({ src, name, alt = "" }) {
+  const [failedSrc, setFailedSrc] = useState("");
+  if (!src || failedSrc === src) return <span aria-hidden="true">{name?.trim()?.charAt(0)?.toUpperCase() || "?"}</span>;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setFailedSrc(src)}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
+  );
+}
+
 function ChatHome() {
   const navigate = useNavigate();
   const [currentUserId] = useState(() => {
@@ -73,9 +86,10 @@ function ChatHome() {
   const [peerDraft, setPeerDraft] = useState("");
   const [socket, setsocket] = useState(null);
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
-  const [myQrOpen, setMyQrOpen] = useState(false);
-  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [qrToolsOpen, setQrToolsOpen] = useState(false);
+  const [qrTab, setQrTab] = useState("scan");
   const [myQrImage, setMyQrImage] = useState("");
+  const [qrGenerationAttempt, setQrGenerationAttempt] = useState(0);
   const [qrScanStatus, setQrScanStatus] = useState("");
   const [qrRequestSending, setQrRequestSending] = useState(false);
   const [requestPanelOpen, setRequestPanelOpen] = useState(false);
@@ -90,6 +104,13 @@ function ChatHome() {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [composerError, setComposerError] = useState("");
   const [profileImage, setProfileImage] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState("");
+  const [profileImageDimensions, setProfileImageDimensions] = useState(null);
+  const [profileZoom, setProfileZoom] = useState(1);
+  const [profileCropX, setProfileCropX] = useState(0);
+  const [profileCropY, setProfileCropY] = useState(0);
+  const [profileImageError, setProfileImageError] = useState("");
+  const [savingProfileImage, setSavingProfileImage] = useState(false);
   const [myProfileImage, setMyProfileImage] = useState("");
   const [myPhone, setMyPhone] = useState("");
   const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
@@ -147,6 +168,26 @@ function ChatHome() {
       .toLowerCase()
       .includes(messageSearch.trim().toLowerCase()),
   );
+  const cropFrameSize = 240;
+  const cropPreviewScale = profileImageDimensions
+    ? Math.max(cropFrameSize / profileImageDimensions.width, cropFrameSize / profileImageDimensions.height) * profileZoom
+    : 1;
+  const cropPreviewWidth = profileImageDimensions ? profileImageDimensions.width * cropPreviewScale : cropFrameSize;
+  const cropPreviewHeight = profileImageDimensions ? profileImageDimensions.height * cropPreviewScale : cropFrameSize;
+  const cropPreviewLeft = (cropFrameSize - cropPreviewWidth) / 2 + (profileCropX / 100) * ((cropPreviewWidth - cropFrameSize) / 2);
+  const cropPreviewTop = (cropFrameSize - cropPreviewHeight) / 2 + (profileCropY / 100) * ((cropPreviewHeight - cropFrameSize) / 2);
+
+  useEffect(() => {
+    if (!profileImage) {
+      setProfileImagePreview("");
+      setProfileImageDimensions(null);
+      return undefined;
+    }
+    const previewUrl = URL.createObjectURL(profileImage);
+    setProfileImagePreview(previewUrl);
+    setProfileImageDimensions(null);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [profileImage]);
 
   const openChat = (user) => {
     setUnreadCounts((counts) => ({ ...counts, [user._id]: 0 }));
@@ -589,7 +630,7 @@ function ChatHome() {
   };
 
   const uploadProfileImage = async (fileToUpload = profileImage) => {
-    if (!fileToUpload) return;
+    if (!fileToUpload) return false;
 
     try {
       const token = localStorage.getItem("token");
@@ -611,16 +652,50 @@ function ChatHome() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.log(data.message);
-        return;
+        setProfileImageError(data.message || "Could not upload your profile photo.");
+        return false;
       }
 
       setMyProfileImage(data.user.profileImage);
       setProfileImage(null);
+      setProfileImageError("");
 
-      console.log("Profile image updated:", data.user.profileImage);
+      return true;
     } catch (error) {
-      console.log(error);
+      setProfileImageError(error.message || "Could not upload your profile photo.");
+      return false;
+    }
+  };
+
+  const saveCroppedProfileImage = async () => {
+    if (!profileImagePreview) return;
+    setSavingProfileImage(true);
+    setProfileImageError("");
+    try {
+      const image = new Image();
+      image.src = profileImagePreview;
+      await image.decode();
+      const size = 512;
+      const scale = Math.max(size / image.naturalWidth, size / image.naturalHeight) * profileZoom;
+      const drawWidth = image.naturalWidth * scale;
+      const drawHeight = image.naturalHeight * scale;
+      const drawX = (size - drawWidth) / 2 + (profileCropX / 100) * ((drawWidth - size) / 2);
+      const drawY = (size - drawHeight) / 2 + (profileCropY / 100) * ((drawHeight - size) / 2);
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Could not prepare the cropped image.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, size, size);
+      context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      const blob = await new Promise((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("Could not crop this image.")), "image/jpeg", 0.92));
+      const croppedImage = new File([blob], "profile-photo.jpg", { type: "image/jpeg" });
+      await uploadProfileImage(croppedImage);
+    } catch (error) {
+      setProfileImageError(error.message || "This image could not be opened for cropping.");
+    } finally {
+      setSavingProfileImage(false);
     }
   };
 
@@ -1192,7 +1267,7 @@ function ChatHome() {
 
   useEffect(() => {
     let active = true;
-    if (!myQrOpen || !currentUserId) return () => { active = false; };
+    if (!qrToolsOpen || qrTab !== "show" || !currentUserId) return () => { active = false; };
     import("qrcode").then(({ default: QRCode }) => QRCode.toDataURL(`connectchat:${currentUserId}`, {
       width: 280,
       margin: 2,
@@ -1204,10 +1279,10 @@ function ChatHome() {
       if (active) setQrScanStatus("Could not create your QR code.");
     });
     return () => { active = false; };
-  }, [myQrOpen, currentUserId]);
+  }, [qrToolsOpen, qrTab, currentUserId, qrGenerationAttempt]);
 
   useEffect(() => {
-    if (!qrScannerOpen) return undefined;
+    if (!qrToolsOpen || qrTab !== "scan") return undefined;
     let cancelled = false;
     let scanner;
     qrScanHandledRef.current = false;
@@ -1239,7 +1314,7 @@ function ChatHome() {
         void scanner.stop().then(() => scanner.clear()).catch(() => {});
       }
     };
-  }, [qrScannerOpen]);
+  }, [qrToolsOpen, qrTab]);
 
   return (
     <div className="chat-page w-full font-sans">
@@ -1272,7 +1347,10 @@ function ChatHome() {
 
                 if (file) {
                   setProfileImage(file);
-                  uploadProfileImage(file);
+                  setProfileZoom(1);
+                  setProfileCropX(0);
+                  setProfileCropY(0);
+                  setProfileImageError("");
                 }
 
                 e.target.value = "";
@@ -1286,14 +1364,7 @@ function ChatHome() {
                 document.getElementById("profile-image-input").click();
               }}
             >
-              {myProfileImage ? (
-                <img
-                  src={`${getImageUrl(myProfileImage)}?t=${Date.now()}`}
-                  alt="My profile"
-                />
-              ) : (
-                profileName.trim().charAt(0).toUpperCase() || "M"
-              )}
+              <AvatarPhoto src={getImageUrl(myProfileImage)} name={profileName} alt="My profile" />
             </Avatar>
             <button className="profile-account-button" type="button" onClick={() => setPhoneDialogOpen(true)}>
               {myPhone ? (profileName || "My account") : "Add mobile number"}
@@ -1319,13 +1390,8 @@ function ChatHome() {
               </IconButton>
             </Tooltip>
             <Tooltip title="Scan a friend QR code" placement="right">
-              <IconButton className="rail-button" aria-label="Scan a friend QR code" onClick={() => { setQrScanStatus(""); setQrScannerOpen(true); }}>
+              <IconButton className="rail-button" aria-label="Scan or show a QR code" onClick={() => { setQrScanStatus(""); setQrTab("scan"); setQrToolsOpen(true); }}>
                 <QrCodeScannerRounded />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Show my QR code" placement="right">
-              <IconButton className="rail-button" aria-label="Show my QR code" onClick={() => { setQrScanStatus(""); setMyQrOpen(true); }}>
-                <QrCodeRounded />
               </IconButton>
             </Tooltip>
             <Tooltip title="Friend requests" placement="right">
@@ -1392,11 +1458,7 @@ function ChatHome() {
                 >
                   <div className="relative flex-shrink-0">
                     <Avatar className="contact-avatar w-10 h-10 rounded-full flex items-center justify-center font-medium">
-                      {user.profileImage ? (
-                        <img src={getImageUrl(user.profileImage)} alt="" />
-                      ) : (
-                        user.name.charAt(0).toUpperCase()
-                      )}
+                      <AvatarPhoto src={getImageUrl(user.profileImage)} name={user.name} />
                     </Avatar>
                     {user.isOnline && (
                       <span className="contact-status-dot"></span>
@@ -1451,14 +1513,7 @@ function ChatHome() {
                   <div className="chat-header-person flex items-center gap-3">
                     <div className="relative">
                       <Avatar className="contact-avatar w-10 h-10 rounded-full flex items-center justify-center font-medium">
-                        {selecteduser.profileImage ? (
-                          <img
-                            src={getImageUrl(selecteduser.profileImage)}
-                            alt=""
-                          />
-                        ) : (
-                          selecteduser.name.charAt(0).toUpperCase()
-                        )}
+                        <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />
                       </Avatar>
                       {selecteduser.isOnline && (
                         <span className="contact-status-dot"></span>
@@ -1537,16 +1592,7 @@ function ChatHome() {
                             <div className="w-7 h-7 flex-shrink-0 mr-2 self-end mb-1">
                               {showAvatar && (
                                 <div className="contact-avatar w-full h-full rounded-full flex items-center justify-center text-[10px] font-medium">
-                                  {selecteduser.profileImage ? (
-                                    <img
-                                      src={getImageUrl(
-                                        selecteduser.profileImage,
-                                      )}
-                                      alt=""
-                                    />
-                                  ) : (
-                                    selecteduser.name.charAt(0).toUpperCase()
-                                  )}
+                                  <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />
                                 </div>
                               )}
                             </div>
@@ -1873,19 +1919,7 @@ function ChatHome() {
                         height: 150,
                       }}
                     >
-                      {selecteduser.profileImage ? (
-                        <img
-                          src={getImageUrl(selecteduser.profileImage)}
-                          alt=""
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        selecteduser.name.charAt(0).toUpperCase()
-                      )}
+                      <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />
                     </Avatar>
                     {selecteduser.isOnline && (
                       <span className="contact-status-dot profile-status-dot"></span>
@@ -2013,32 +2047,31 @@ function ChatHome() {
           </section>
         </div>
       )}
-      {myQrOpen && (
+      {qrToolsOpen && (
         <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setMyQrOpen(false);
+          if (event.target === event.currentTarget) setQrToolsOpen(false);
         }}>
-          <section className="contact-picker qr-dialog" role="dialog" aria-modal="true" aria-labelledby="my-qr-title">
+          <section className="contact-picker qr-dialog" role="dialog" aria-modal="true" aria-labelledby="qr-tools-title">
             <header className="contact-picker-header">
-              <div><p className="chat-overline">CONNECT</p><h2 id="my-qr-title">Your friend QR code</h2><p>Let someone scan this code to send you a friend request.</p></div>
-              <IconButton className="contact-picker-close" aria-label="Close my QR code" onClick={() => setMyQrOpen(false)}><CloseRounded /></IconButton>
+              <div><p className="chat-overline">CONNECT</p><h2 id="qr-tools-title">Connect with a QR code</h2><p>{qrTab === "scan" ? "Scan someone’s code to send them a friend request." : "Let someone scan your code to request to connect."}</p></div>
+              <IconButton className="contact-picker-close" aria-label="Close QR options" onClick={() => setQrToolsOpen(false)}><CloseRounded /></IconButton>
             </header>
-            {myQrImage ? <img className="my-friend-qr" src={myQrImage} alt={`Unique Connect QR code for ${profileName}`} /> : <p className="contact-picker-empty">Creating your QR code…</p>}
-            <strong className="qr-account-name">{profileName}</strong>
-            <p className="qr-help-text">A friend request still needs your approval before messaging can begin.</p>
-          </section>
-        </div>
-      )}
-      {qrScannerOpen && (
-        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setQrScannerOpen(false);
-        }}>
-          <section className="contact-picker qr-dialog" role="dialog" aria-modal="true" aria-labelledby="qr-scanner-title">
-            <header className="contact-picker-header">
-              <div><p className="chat-overline">CONNECT</p><h2 id="qr-scanner-title">Scan a friend QR code</h2><p>Allow camera access and point it at their code.</p></div>
-              <IconButton className="contact-picker-close" aria-label="Close QR scanner" onClick={() => setQrScannerOpen(false)}><CloseRounded /></IconButton>
-            </header>
-            <div id="connect-qr-reader" className="connect-qr-reader" />
-            {qrScanStatus && <p className="qr-help-text" role="status">{qrScanStatus}</p>}
+            <div className="qr-tabs" role="tablist" aria-label="QR code options">
+              <button type="button" role="tab" aria-selected={qrTab === "scan"} className={qrTab === "scan" ? "active" : ""} onClick={() => { setQrScanStatus(""); setQrTab("scan"); }}><QrCodeScannerRounded /> Scan</button>
+              <button type="button" role="tab" aria-selected={qrTab === "show"} className={qrTab === "show" ? "active" : ""} onClick={() => { setQrScanStatus(""); setQrTab("show"); }}><QrCodeRounded /> My QR</button>
+            </div>
+            {qrTab === "scan" ? (
+              <>
+                <div id="connect-qr-reader" className="connect-qr-reader" />
+                {qrScanStatus && <p className="qr-help-text" role="status">{qrScanStatus}</p>}
+              </>
+            ) : (
+              <>
+                {myQrImage ? <img className="my-friend-qr" src={myQrImage} alt={`Unique Connect QR code for ${profileName}`} /> : <div className="qr-generation-state"><p className="contact-picker-empty">{qrScanStatus || "Creating your QR code…"}</p>{qrScanStatus && <button type="button" onClick={() => { setQrScanStatus(""); setQrGenerationAttempt((attempt) => attempt + 1); }}>Try again</button>}</div>}
+                <strong className="qr-account-name">{profileName}</strong>
+                <p className="qr-help-text">Friend requests need your approval before messaging can begin.</p>
+              </>
+            )}
           </section>
         </div>
       )}
@@ -2165,6 +2198,27 @@ function ChatHome() {
               {phoneError && <p className="friend-action-error" role="alert">{phoneError}</p>}
               <button className="phone-save-button" type="submit">Save mobile number</button>
             </form>
+          </section>
+        </div>
+      )}
+      {profileImage && (
+        <div className="contact-picker-backdrop" role="presentation">
+          <section className="contact-picker photo-crop-dialog" role="dialog" aria-modal="true" aria-labelledby="photo-crop-title">
+            <header className="contact-picker-header">
+              <div><p className="chat-overline">PROFILE PHOTO</p><h2 id="photo-crop-title">Adjust your picture</h2><p>Move and zoom the image to choose what appears in your avatar.</p></div>
+              <IconButton className="contact-picker-close" aria-label="Cancel photo adjustment" onClick={() => { setProfileImage(null); setProfileImageError(""); }}><CloseRounded /></IconButton>
+            </header>
+            <div className="photo-crop-preview" style={{ width: cropFrameSize, height: cropFrameSize }}>
+              {profileImagePreview && <img src={profileImagePreview} alt="Profile photo crop preview" onLoad={(event) => setProfileImageDimensions({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} style={{ width: cropPreviewWidth, height: cropPreviewHeight, left: cropPreviewLeft, top: cropPreviewTop }} />}
+            </div>
+            <label className="photo-crop-control">Zoom <span>{profileZoom.toFixed(1)}×</span><input type="range" min="1" max="3" step="0.05" value={profileZoom} onChange={(event) => setProfileZoom(Number(event.target.value))} /></label>
+            <label className="photo-crop-control">Horizontal position<input type="range" min="-100" max="100" value={profileCropX} onChange={(event) => setProfileCropX(Number(event.target.value))} disabled={cropPreviewWidth <= cropFrameSize} /></label>
+            <label className="photo-crop-control">Vertical position<input type="range" min="-100" max="100" value={profileCropY} onChange={(event) => setProfileCropY(Number(event.target.value))} disabled={cropPreviewHeight <= cropFrameSize} /></label>
+            {profileImageError && <p className="friend-action-error" role="alert">{profileImageError}</p>}
+            <div className="photo-crop-actions">
+              <button type="button" className="photo-crop-cancel" onClick={() => { setProfileImage(null); setProfileImageError(""); }} disabled={savingProfileImage}>Cancel</button>
+              <button type="button" className="photo-crop-save" onClick={saveCroppedProfileImage} disabled={savingProfileImage || !profileImageDimensions}>{savingProfileImage ? "Saving…" : "Save profile picture"}</button>
+            </div>
           </section>
         </div>
       )}

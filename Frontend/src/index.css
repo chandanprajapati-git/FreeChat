@@ -1126,7 +1126,46 @@
 .connect-qr-reader #qr-shaded-region { border-color: #8bd0ff !important; }
 .connect-qr-reader button { margin: 5px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; color: #fff; background: rgba(255,255,255,.1); }
 .connect-qr-reader select { max-width: 100%; padding: 6px; border-radius: 7px; }
+.qr-tabs { display: flex; gap: 8px; width: min(100%, 360px); margin: 0 0 14px; padding: 4px; border: 1px solid rgba(255,255,255,.12); border-radius: 11px; background: rgba(255,255,255,.06); }
+.qr-tabs button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 7px; min-height: 38px; border: 0; border-radius: 8px; color: rgba(255,255,255,.72); background: transparent; font-size: 12px; cursor: pointer; }
+.qr-tabs button svg { width: 18px; height: 18px; }
+.qr-tabs button.active { color: #fff; background: rgba(139,208,255,.2); box-shadow: inset 0 0 0 1px rgba(139,208,255,.28); }
+.qr-generation-state { display: grid; justify-items: center; gap: 8px; }
+.qr-generation-state button { padding: 8px 13px; border: 1px solid rgba(255,255,255,.2); border-radius: 9px; color: #fff; background: rgba(255,255,255,.1); cursor: pointer; }
+.photo-crop-dialog { align-items: center; gap: 4px; }
+.photo-crop-dialog .contact-picker-header { width: 100%; align-self: stretch; }
+.photo-crop-preview { position: relative; flex: 0 0 auto; overflow: hidden; border: 3px solid rgba(255,255,255,.85); border-radius: 50%; background: #15191f; box-shadow: 0 8px 28px rgba(0,0,0,.28); }
+.photo-crop-preview img { position: absolute; max-width: none; max-height: none; object-fit: fill; user-select: none; pointer-events: none; }
+.photo-crop-control { display: grid; grid-template-columns: 1fr auto; gap: 5px 12px; width: min(100%, 340px); margin-top: 12px; color: rgba(255,255,255,.86); font-size: 12px; }
+.photo-crop-control span { color: #b8dcf4; }
+.photo-crop-control input { grid-column: 1 / -1; width: 100%; accent-color: #83c9ff; }
+.photo-crop-control input:disabled { opacity: .35; }
+.photo-crop-actions { display: flex; justify-content: flex-end; gap: 9px; width: 100%; margin-top: 15px; }
+.photo-crop-actions button { min-height: 40px; padding: 0 14px; border: 1px solid rgba(255,255,255,.18); border-radius: 10px; color: #fff; cursor: pointer; }
+.photo-crop-cancel { background: rgba(255,255,255,.08); }
+.photo-crop-save { background: #397bb2; }
+.photo-crop-actions button:disabled { opacity: .55; cursor: wait; }
 @media (max-width: 700px) {
   .connect-qr-reader { min-height: 220px; }
   .connect-qr-reader video { max-height: 48dvh; }
+  .photo-crop-dialog { max-height: calc(100dvh - 20px); overflow-y: auto; }
+}
+
+/* Keep app icons crisp and animate chat/page changes without relying on icon fonts. */
+.chat-window .MuiSvgIcon-root { display: block; flex: 0 0 auto; color: currentColor; }
+@keyframes chat-pane-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes message-enter {
+  from { opacity: 0; transform: translateY(5px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.chat-workspace.has-selected-chat > .chat-main,
+.chat-workspace:not(.has-selected-chat) > .chat-sidebar { animation: chat-pane-enter 190ms ease-out both; }
+.chat-message-stack > .flex { animation: message-enter 170ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .chat-workspace.has-selected-chat > .chat-main,
+  .chat-workspace:not(.has-selected-chat) > .chat-sidebar,
+  .chat-message-stack > .flex { animation: none !important; }
 }
