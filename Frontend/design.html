@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AetherChat - Elena Rostova</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Plus Jakarta Sans Font -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration verbatim from Design System -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-background": "#e0e2ef",
+            "tertiary": "#4edea3",
+            "inverse-on-surface": "#2d303a",
+            "primary-fixed-dim": "#c0c1ff",
+            "error-container": "#93000a",
+            "secondary-container": "#03b5d3",
+            "primary": "#c0c1ff",
+            "surface-container-high": "#272a34",
+            "on-primary": "#1000a9",
+            "primary-fixed": "#e1e0ff",
+            "inverse-surface": "#e0e2ef",
+            "primary-container": "#8083ff",
+            "on-primary-fixed": "#07006c",
+            "on-tertiary-container": "#000703",
+            "tertiary-fixed-dim": "#4edea3",
+            "surface-container-low": "#181b25",
+            "surface-container-lowest": "#0b0e17",
+            "on-surface-variant": "#c7c4d7",
+            "secondary": "#4cd7f6",
+            "surface-dim": "#10131c",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface-bright": "#363943",
+            "surface-container": "#1c1f29",
+            "secondary-fixed": "#acedff",
+            "on-error-container": "#ffdad6",
+            "on-secondary-container": "#00424e",
+            "surface-variant": "#32343f",
+            "on-primary-container": "#0d0096",
+            "on-tertiary-fixed-variant": "#005236",
+            "on-tertiary": "#003824",
+            "secondary-fixed-dim": "#4cd7f6",
+            "outline": "#908fa0",
+            "surface": "#10131c",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "tertiary-container": "#00885d",
+            "error": "#ffb4ab",
+            "inverse-primary": "#494bd6",
+            "on-secondary-fixed": "#001f26",
+            "background": "#10131c",
+            "on-tertiary-fixed": "#002113",
+            "surface-container-highest": "#32343f",
+            "outline-variant": "#464554",
+            "surface-tint": "#c0c1ff",
+            "on-error": "#690005",
+            "on-surface": "#e0e2ef",
+            "tertiary-fixed": "#6ffbbe",
+            "on-secondary": "#003640"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "space-xs": "0.25rem",
+            "space-xl": "2rem",
+            "margin": "1.25rem",
+            "space-md": "0.875rem",
+            "gutter": "1rem",
+            "space-lg": "1.25rem"
+          },
+          "fontFamily": {
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "headline-lg-mobile": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "label-sm": ["10px", { "lineHeight": "12px", "fontWeight": "500" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+            "label-lg": ["14px", { "lineHeight": "18px", "fontWeight": "600" }],
+            "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "32px", "fontWeight": "700" }],
+            "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      text-transform: none;
+      letter-spacing: normal;
+      word-wrap: normal;
+      white-space: nowrap;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Neon Glow & Custom Blur Utilities */
+    .glow-cyan {
+      filter: drop-shadow(0 0 6px rgba(76, 215, 246, 0.7));
+    }
+    .glow-emerald {
+      box-shadow: 0 0 10px rgba(78, 222, 163, 0.75);
+    }
+    .glow-violet {
+      box-shadow: 0 0 24px rgba(128, 131, 255, 0.35);
+    }
+    /* Custom Scrollbar for Chat */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-lowest text-on-surface font-body-md text-body-md min-h-screen overflow-hidden antialiased selection:bg-primary selection:text-on-primary">
+<!-- Atmospheric Background Canvas (Layer 0) with Vibrant Neon Glowing Orbs -->
+<div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+<div class="absolute -top-[10%] left-[15%] w-[550px] h-[550px] rounded-full bg-primary-container/25 blur-[128px]"></div>
+<div class="absolute top-[40%] -left-[10%] w-[500px] h-[500px] rounded-full bg-secondary-container/20 blur-[140px]"></div>
+<div class="absolute bottom-[5%] right-[10%] w-[600px] h-[600px] rounded-full bg-tertiary-container/20 blur-[150px]"></div>
+<div class="absolute top-[20%] right-[5%] w-[420px] h-[420px] rounded-full bg-primary/15 blur-[110px]"></div>
+</div>
+<div class="relative z-10 flex h-screen w-full overflow-hidden">
+<!-- DESKTOP / TABLET CHAT DRAWER & SIDEBAR (Matches Shared Component NavigationDrawer) -->
+<aside class="hidden md:flex flex-col flex-shrink-0 w-80 lg:w-96 h-full bg-surface-container-low/70 backdrop-blur-2xl border-r border-outline-variant/30 shadow-2xl shadow-surface-container-lowest/80 transition-all duration-300 z-40" id="chatDrawer">
+<!-- Drawer Header / User Profile -->
+<div class="p-space-lg flex items-center justify-between border-b border-outline-variant/20">
+<div class="flex items-center gap-3">
+<div class="relative">
+<div class="w-11 h-11 rounded-full bg-cover bg-center border border-white/20" data-alt="Sophisticated portrait of a modern European product designer with neat dark hair, styled in a sleek dark studio setting illuminated by vibrant violet and cyan neon rim lighting, matching the luxurious aesthetic of an exclusive glassmorphic digital chat ecosystem." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA8T0jDooKtYxNVqpxGXkZw3RTs4rKWJtKNKJyzBCKFFyLywkaNMQC_i0VsWq_6ZV694hyRNXqVuEaL1jQ_dFP14OgkC20E7vj4Pvf6Q0QB9YpNbN6u8ceeXGIF7xYELuvY8tut2Ob_oyF8dr2-LjVTPcfvMEcHvzkkY9IcUXMBmT6eqHUAOkhHyV6rAhWoU11dH4vAxDFP1BWc2IakYDtX4-NRNqG9SF9nvClmIb6yH5p6ALqhaqKmeBEKOE_HjKAi8KoPluvrQg')"></div>
+<!-- Online status ring -->
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-tertiary border-2 border-surface-container-lowest glow-emerald"></span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Alexandre V.</span>
+<span class="px-1.5 py-0.5 rounded bg-primary/20 text-primary-fixed border border-primary/30 font-label-sm text-label-sm font-semibold">Premium</span>
+</div>
+<p class="font-label-md text-label-md text-tertiary flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span> Online
+            </p>
+</div>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<button aria-label="Status Stories" class="p-2 rounded-xl hover:bg-surface-bright/20 hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="data_saver_on">data_saver_on</span>
+</button>
+<button aria-label="New Chat" class="p-2 rounded-xl hover:bg-surface-bright/20 hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="add_comment">add_comment</span>
+</button>
+</div>
+</div>
+<!-- NavigationDrawer Categories / Filter Pills -->
+<div class="px-4 py-3 flex gap-2 border-b border-outline-variant/15 overflow-x-auto no-scrollbar">
+<!-- Exact match for NavigationDrawer label_texts: All Chats (active), Unread, Groups, Archived -->
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/15 text-primary-fixed border border-primary/30 font-label-md text-label-md font-semibold whitespace-nowrap">
+<span class="material-symbols-outlined text-[16px]" data-icon="chat">chat</span>
+          All Chats
+        </button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface transition-all font-label-md text-label-md font-medium whitespace-nowrap">
+<span class="material-symbols-outlined text-[16px]" data-icon="mark_chat_unread">mark_chat_unread</span>
+          Unread
+          <span class="w-4 h-4 rounded-full bg-primary-container text-on-primary font-label-sm text-label-sm flex items-center justify-center font-bold">3</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface transition-all font-label-md text-label-md font-medium whitespace-nowrap">
+<span class="material-symbols-outlined text-[16px]" data-icon="group">group</span>
+          Groups
+        </button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface transition-all font-label-md text-label-md font-medium whitespace-nowrap">
+<span class="material-symbols-outlined text-[16px]" data-icon="archive">archive</span>
+          Archived
+        </button>
+</div>
+<!-- Search Input within Drawer -->
+<div class="px-4 py-2.5">
+<div class="relative flex items-center w-full">
+<span class="material-symbols-outlined absolute left-3 text-outline text-[18px]" data-icon="search">search</span>
+<input class="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-container/60 border border-outline-variant/30 text-on-surface placeholder:text-outline text-body-sm font-body-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all" placeholder="Search or start new chat" type="text"/>
+</div>
+</div>
+<!-- Conversations Contact List -->
+<div class="flex-1 overflow-y-auto px-2 space-y-1">
+<!-- Active Chat: Elena Rostova -->
+<div class="group relative flex items-center gap-3 p-3 rounded-2xl bg-surface-bright/20 border border-white/10 shadow-sm cursor-pointer transition-all">
+<div class="relative flex-shrink-0">
+<div class="w-12 h-12 rounded-2xl bg-cover bg-center border border-white/20" data-alt="High-fashion portrait of Elena Rostova, a young woman with elegant sharp facial features and sleek light auburn hair, softly illuminated with cinematic cyan and violet specular highlights against a dark translucent blurred glass studio background." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDsETz2lp_nreo-exqqJMCn2xwa-fN6l9M1KemBjlq-8S7xSF71bQCSLTwZgpA4bsZPyjeF901bloXYtqNJxmz4lioi692sVdcwlrJROf9XrJzNlGoSL-evjSZyg_wXHBpnKdGreDS6EdnuXrbrIzHGTBE0ZzTwuuLmJ8Cg7P7tKu5iBYYGUxL3hmaICyJFDsjnRCDSU6LEDwrL62LB1_d4ZEmJIZD2xwH90de8fp1qcJrWEzzrH37tnmIw2AxKrx-Zg4BBSCbXlg')"></div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-tertiary border-2 border-surface-container-low glow-emerald"></span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface truncate">Elena Rostova</h3>
+<span class="font-label-sm text-label-sm text-secondary font-medium">10:48 AM</span>
+</div>
+<div class="flex items-center justify-between mt-0.5">
+<p class="font-body-sm text-body-sm text-primary-fixed truncate flex items-center gap-1">
+<span class="material-symbols-outlined text-secondary text-[16px]" data-icon="mic">mic</span>
+                Voice note (0:24)
+              </p>
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container shadow-sm shadow-primary"></span>
+</div>
+</div>
+</div>
+<!-- Liam Chen -->
+<div class="group relative flex items-center gap-3 p-3 rounded-2xl hover:bg-surface-variant/30 border border-transparent hover:border-white/5 cursor-pointer transition-all">
+<div class="relative flex-shrink-0">
+<div class="w-12 h-12 rounded-2xl bg-cover bg-center border border-white/10" data-alt="Portrait photo of Liam Chen, an Asian creative technologist with sleek spectacles, wearing a modern black turtleneck, lit by subtle architectural ambient cyan backlight in a high-tech glass lounge." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCa5VOPma-KDvovrixtAvFNeYT6oMF41ie_HXhA_sxS4Y2AdJKpx7ne1g3__-w4IA5VqiT5zlvSuTzLkf_bt8E-CHogpIOUTHgIYUGXo_TsWd3_2uVbyfLdKk-7MsBHpT-LqNy4nP3FNM8S65aKdT5DxK7r_MCWfwHMRLqm-utlbtcSHFJN2GY2e-tUDrodDnqQaqektX6NQNM9vsJWnfFD2oJQTEdrFT07H5AS_5m6NYaRkVbXWGVCPnsNSV_ou8tJJT8ChPB2hQ')"></div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-tertiary border-2 border-surface-container-low glow-emerald"></span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<h3 class="font-label-lg text-label-lg font-semibold text-on-surface truncate">Liam Chen</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">10:15 AM</span>
+</div>
+<div class="flex items-center justify-between mt-0.5">
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">The design tokens are ready for review!</p>
+<span class="px-1.5 py-0.5 rounded-full bg-primary-container text-on-primary font-label-sm text-label-sm font-bold">2</span>
+</div>
+</div>
+</div>
+<!-- Sophia Martinez -->
+<div class="group relative flex items-center gap-3 p-3 rounded-2xl hover:bg-surface-variant/30 border border-transparent hover:border-white/5 cursor-pointer transition-all">
+<div class="relative flex-shrink-0">
+<div class="w-12 h-12 rounded-2xl bg-cover bg-center border border-white/10" data-alt="Portrait of Sophia Martinez, an art director with curly dark hair and warm glowing skin, illuminated by soft violet and magenta studio lights in front of an atmospheric dark frosted architectural background." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD54iYQwnN12Wc1nNnn4_nm5Cya8WaAtWMUw9rhAYdzsm7zUo5W--rL5Hn6kdqIk7IXJHsqT4KkibyQkeoab0zkzPfL_2yLjlqPneiL3YSGVaRi5u6WypkkaIkoImBiqh6TYq-w0Ov0aNwCMVd4KMYDHGGN49IFzfbR8XDxeJmoPaXnN9CGYUgUWn1ZxnX4sEgHrHKtZ5ezX-1r1ALrJYTvG2RwEtVdGL0xtbgDX4D3vFO1oZd5a_aX3X_awy1nXjVDiwPzSrIeVQ')"></div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-outline border-2 border-surface-container-low"></span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<h3 class="font-label-lg text-label-lg font-semibold text-on-surface truncate">Sophia Martinez</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Yesterday</span>
+</div>
+<div class="flex items-center justify-between mt-0.5">
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Loved the glassmorphic shaders draft</p>
+</div>
+</div>
+</div>
+<!-- Marcus Vance -->
+<div class="group relative flex items-center gap-3 p-3 rounded-2xl hover:bg-surface-variant/30 border border-transparent hover:border-white/5 cursor-pointer transition-all">
+<div class="relative flex-shrink-0">
+<div class="w-12 h-12 rounded-2xl bg-cover bg-center border border-white/10" data-alt="Cinematic profile portrait of Marcus Vance, a creative writer with sharp beard and thoughtful expression, bathed in ambient deep indigo and emerald neon light within an opulent modern interior." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAMPEnRCQ__q4q1S7F54A9w4oh5eV6DMO6A8W48tPuoONWHH08rU3KUmqC3-YnuG-aehBn3P0Vh_QKVXQmeOffIjoAWNjCX63q2kKZnw5x9sBHOtfS1s9H2ktK6cElNF96zucxhEtK-94E45CSHeNG2asTuF-tT7PJp-XIBN42uR4z5PtMgZYowrOzGY2h-_KkmHhC_ikw0w5UMI-z71WWA22SiBw1vTywzvV5J8IRXkSESECBpmPQLe0Qbd_3RMD3FfMHUpShfDQ')"></div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-outline border-2 border-surface-container-low"></span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<h3 class="font-label-lg text-label-lg font-semibold text-on-surface truncate">Marcus Vance</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Oct 22</span>
+</div>
+<div class="flex items-center justify-between mt-0.5">
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-secondary" data-icon="done_all">done_all</span>
+                See you at the keynote conference!
+              </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Drawer Footer Switcher (Settings & Encryption notice) -->
+<div class="p-3 border-t border-outline-variant/20 flex items-center justify-between bg-surface-container/30">
+<div class="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px] text-tertiary" data-icon="lock">lock</span>
+<span>End-to-end encrypted</span>
+</div>
+<button aria-label="Settings" class="p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-bright/20 transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="settings">settings</span>
+</button>
+</div>
+</aside>
+<!-- MAIN CHAT CANVAS -->
+<main class="flex-1 flex flex-col h-full relative overflow-hidden bg-transparent">
+<!-- TOP APP BAR (Shared Component: TopAppBar) -->
+<!-- Attributes from JSON: headline: Elena Rostova, leading: avatar, trailing: videocam, style classes applied -->
+<header class="sticky top-0 left-0 right-0 z-40 flex justify-between items-center px-4 py-3 w-full bg-surface-container/60 backdrop-blur-xl border-b border-outline-variant/30 shadow-lg shadow-surface-container-lowest/50">
+<!-- Leading: Avatar & User Status Details -->
+<div class="flex items-center gap-3">
+<!-- Mobile Drawer Toggle / WhatsApp Back Chevron -->
+<button aria-label="Back" class="md:hidden p-1.5 -ml-1 text-on-surface hover:bg-surface-bright/20 rounded-xl transition-colors">
+<span class="material-symbols-outlined text-[24px]" data-icon="arrow_back">arrow_back</span>
+</button>
+<!-- Avatar with glowing status rim -->
+<div class="relative cursor-pointer group">
+<div class="w-10 h-10 md:w-11 md:h-11 rounded-full bg-cover bg-center border border-white/25 shadow-md" data-alt="Detailed close-up profile portrait of Elena Rostova with refined features, wearing modern charcoal attire, softly illuminated by luminous cyan and neon emerald reflection rings, casting an ultra-luxurious frosted glass appearance." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCyATl3MvnEDL2yTlpmd6dNAPVwxgsOcAWZZjnoi1nwMVererQZjorslpTEMJv6lp3xRrT-7m7Z7FEWiLARSyCNkEOmKN_rrt_vlAIfCTg8HBzIcvhaRuQlTO7OCf_NwCsHNdavMT21mzEJAGKg445Mv76bNflfzs7g6UZAgzOpnwEmXZoafNt_Ro8jX0mNZ8esDgn9tnfQbueivfOz-AcAPDLwkOGAlMJQRDSZGxoEawf0nF6I7tjnI78pwoN3IN85YROssloFBw')"></div>
+<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-tertiary border-2 border-surface-container glow-emerald animate-pulse"></span>
+</div>
+<!-- Headline and status metadata -->
+<div class="cursor-pointer">
+<h1 class="text-headline-sm font-headline-sm font-semibold text-on-surface flex items-center gap-1.5">
+              Elena Rostova
+              <span class="material-symbols-outlined text-[16px] text-secondary" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</h1>
+<p class="text-label-md font-label-md text-tertiary flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Active now
+            </p>
+</div>
+</div>
+<!-- Trailing: Audio/Video Glass Action Cluster & Menu -->
+<div class="flex items-center gap-1.5 sm:gap-2">
+<!-- Audio Call Button -->
+<button aria-label="Audio call" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-surface-variant/40 hover:bg-surface-bright/30 border border-white/10 text-on-surface shadow-sm active:scale-95 transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary" data-icon="call">call</span>
+<span class="hidden lg:inline text-label-md font-label-md">Audio</span>
+</button>
+<!-- Video Call Button (Exact JSON trailing_icon: videocam) -->
+<button aria-label="Video call" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-surface-variant/40 hover:bg-surface-bright/30 border border-white/10 text-primary shadow-sm active:scale-95 transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary" data-icon="videocam">videocam</span>
+<span class="hidden lg:inline text-label-md font-label-md text-primary-fixed">Video</span>
+</button>
+<!-- Conversation Overflow Menu -->
+<button aria-label="More options" class="p-2 rounded-xl hover:bg-surface-bright/20 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</header>
+<!-- CENTRAL CONVERSATION CANVAS (WhatsApp Stream Style) -->
+<div class="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 pb-28 md:pb-28">
+<!-- Date Separator Badge: Frosted Pill -->
+<div class="flex justify-center my-2">
+<div class="px-4 py-1 rounded-full bg-surface-container-high/60 backdrop-blur-xl border border-white/10 shadow-sm">
+<span class="text-label-sm font-label-sm text-on-surface-variant tracking-wider uppercase font-semibold">Today, October 24</span>
+</div>
+</div>
+<!-- System Message: End to End Encryption -->
+<div class="flex justify-center my-2">
+<div class="max-w-md px-4 py-2 rounded-2xl bg-surface-container-lowest/40 backdrop-blur-md border border-white/5 text-center flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-tertiary" data-icon="lock">lock</span>
+<span class="text-body-sm font-body-sm text-outline">Messages and calls are end-to-end encrypted. No one outside of this chat can read or listen.</span>
+</div>
+</div>
+<!-- 1. RECEIVED MESSAGE (Incoming Glass Bubble) -->
+<div class="flex items-end gap-2 max-w-xl group">
+<div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mb-1 border border-white/15">
+<div class="w-full h-full bg-cover bg-center" data-alt="Avatar thumbnail of Elena Rostova with sleek dark copper hair, reflecting deep indigo and cyan hues against a frosted glass backdrop." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA-YixyY4C7dQTYHmfYYQQMO-Mwd3lAWBc73GcDuK37auONDOt7Mydx8BrLcVkT6JSPf1AWnPsDeNy0LEZLzzsh8TFRy3Oudj1LF0_M3UrwhyOQUz9SS0lE4-lz6mwNSLBXt5W2EhvV1QRf8zX3ssjEetuDNt5ClylZzvoYT4PrQ7iZZK9iUCIantMiPY4GMFaxxI0cZd6mVQSu26zaZUnlWiO34fawO00QtZ-7wlps7pXvKVV1NgyiNxrWDwyviPgTqidSTYnw2Q')"></div>
+</div>
+<div class="relative">
+<!-- Glass Pane Bubble -->
+<div class="p-4 rounded-3xl rounded-bl-sm bg-surface-variant/40 backdrop-blur-xl border border-white/15 shadow-xl text-on-surface">
+<p class="font-body-md text-body-md leading-relaxed text-on-background">
+                Hey Alexandre! Have you finished reviewing the new glassmorphic telemetry dashboard specs? The client is eager to see the interactive glow state.
+              </p>
+<div class="flex items-center justify-end gap-1 mt-1 text-right">
+<span class="font-label-sm text-label-sm text-outline">10:42 AM</span>
+</div>
+</div>
+<!-- Floating Quick Reaction Emoji Pill -->
+<div class="absolute -top-3 left-6 flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high/80 backdrop-blur-md border border-white/15 shadow-md">
+<span class="text-[12px]">✨</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">1</span>
+</div>
+</div>
+</div>
+<!-- 2. SENT MESSAGE (Outgoing Luminous Gradient Glass Bubble - Sent Receipt: Single Checkmark) -->
+<div class="flex justify-end group">
+<div class="max-w-xl">
+<div class="p-4 rounded-3xl rounded-br-sm bg-gradient-to-br from-primary-container/80 via-primary/75 to-inverse-primary/80 backdrop-blur-xl border border-white/25 shadow-xl text-on-primary-container">
+<p class="font-body-md text-body-md leading-relaxed text-white drop-shadow-sm font-medium">
+                Yes! Just finished exporting the three-dimensional raymarched lighting pass. The depth blur and electric indigo accents look incredible.
+              </p>
+<div class="flex items-center justify-end gap-1.5 mt-1">
+<span class="font-label-sm text-label-sm text-white/80">10:44 AM</span>
+<!-- Sent Receipt: Single grey checkmark (✓) -->
+<span class="material-symbols-outlined text-[16px] text-white/70" data-icon="check">check</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. SENT MESSAGE WITH MEDIA ATTACHMENT (Design Mockup Preview & Delivered Receipt: Double Checkmark) -->
+<div class="flex justify-end group">
+<div class="max-w-md w-full">
+<div class="p-2.5 rounded-3xl rounded-br-sm bg-gradient-to-br from-primary-container/85 to-primary/80 backdrop-blur-xl border border-white/30 shadow-2xl text-on-primary-container space-y-2">
+<!-- Media Image Container with specular glass frame -->
+<div class="relative rounded-2xl overflow-hidden border border-white/20 aspect-[16/10] bg-surface-container-lowest">
+<div class="w-full h-full bg-cover bg-center transform group-hover:scale-105 transition-transform duration-500" data-alt="High-resolution digital preview of an ultra-futuristic holographic telemetry UI concept on dark translucent glass panels, glowing with neon cyan data wave rings, electric violet volumetric charts, and emerald battery indicators, set against deep atmospheric space." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCs1ZwQYJrJYrQM9vhyrv4fWlGA0EIaJWcQoXfyibJ4xINwU_66bbvjlaWEe0e2spUGj24pBi3CKCA7-fMzRZ4e1_40UHkTBm_AqLOZh2N23NkUhLVMw3mxqCUkHZZ9qVwk5Vm-vnS4WatSwjfEJDmz-qfA3nEif1kSWUiqPJOZ6l6OiwxNZ6jIzcVhiLJrW5K-CIsfoEx22I5gne7Fm3cwWsaPvVhvRQrITmzT6Qotz8zVRAn1peer0SpbMbJAZgznW074NxJ7-Q')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+<div class="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white font-label-md text-label-md">
+<span class="flex items-center gap-1.5 backdrop-blur-md bg-black/40 px-2.5 py-1 rounded-full border border-white/20">
+<span class="material-symbols-outlined text-[16px] text-secondary" data-icon="image">image</span>
+                    telemetry-v4-render.png
+                  </span>
+<span class="backdrop-blur-md bg-black/40 px-2 py-1 rounded-full border border-white/20 text-label-sm font-label-sm">4.8 MB</span>
+</div>
+</div>
+<!-- Media Caption -->
+<div class="px-2 pt-1">
+<p class="font-body-md text-body-md text-white font-medium">
+                  Here is the viewport render. Let me know if the neon contrast holds up under bright ambient conditions.
+                </p>
+<div class="flex items-center justify-end gap-1.5 mt-1.5">
+<span class="font-label-sm text-label-sm text-white/80">10:45 AM</span>
+<!-- Delivered Message: Double checkmark (✓✓) in subdued state -->
+<span class="material-symbols-outlined text-[17px] text-white/75" data-icon="done_all">done_all</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 4. RECEIVED MESSAGE: Interactive Audio Voice Note Snippet -->
+<div class="flex items-end gap-2 max-w-lg group">
+<div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 mb-1 border border-white/15">
+<div class="w-full h-full bg-cover bg-center" data-alt="Elena Rostova smiling softly in a creative workspace illuminated with neon cyan backlights, wearing modern studio headset." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDD3XP7BOXa8P-Mt9h5ROWTUNpFD_TdfbWKFF64gsUg27PHszEslMwWTpxwExNJy11XpCXsiNeFBBJ9lN1BwCxEP_Rl5ogLbuGoMnB7d2tZZFzurv6aVSI1-YcPll0xUPo_4RNEUwZC9sfYXAvhvqwfw7xgGw6myiYocBqtAELDsKNDZAmT6z8M7ld6VWNqkMWqan4FNnpjmBRYG8PaFDIfe2h1Apu7q-Bbou9uqMhXIcB4kANfOycEZWIAK1-OyC1JdOQrHygkKw')"></div>
+</div>
+<div class="flex-1 p-3.5 rounded-3xl rounded-bl-sm bg-surface-variant/40 backdrop-blur-xl border border-white/15 shadow-xl text-on-surface">
+<!-- Voice note player widget -->
+<div class="flex items-center gap-3">
+<!-- Play Button -->
+<button aria-label="Play audio memo" class="w-11 h-11 rounded-2xl bg-secondary-container text-on-secondary flex items-center justify-center flex-shrink-0 shadow-lg shadow-secondary/30 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[24px]" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<!-- Waveform visualization -->
+<div class="flex-1">
+<div class="flex items-center gap-0.5 h-8">
+<!-- Translucent waveform bars (Played in cyan, unplayed in translucent white) -->
+<span class="w-1 bg-secondary rounded-full h-3 glow-cyan"></span>
+<span class="w-1 bg-secondary rounded-full h-5 glow-cyan"></span>
+<span class="w-1 bg-secondary rounded-full h-7 glow-cyan"></span>
+<span class="w-1 bg-secondary rounded-full h-4 glow-cyan"></span>
+<span class="w-1 bg-secondary rounded-full h-6 glow-cyan"></span>
+<span class="w-1 bg-secondary rounded-full h-8 glow-cyan"></span>
+<span class="w-1 bg-secondary rounded-full h-5 glow-cyan"></span>
+<span class="w-1 bg-secondary rounded-full h-3 glow-cyan"></span>
+<!-- Unplayed remainder -->
+<span class="w-1 bg-white/20 rounded-full h-4"></span>
+<span class="w-1 bg-white/20 rounded-full h-6"></span>
+<span class="w-1 bg-white/20 rounded-full h-7"></span>
+<span class="w-1 bg-white/20 rounded-full h-5"></span>
+<span class="w-1 bg-white/20 rounded-full h-3"></span>
+<span class="w-1 bg-white/20 rounded-full h-6"></span>
+<span class="w-1 bg-white/20 rounded-full h-8"></span>
+<span class="w-1 bg-white/20 rounded-full h-4"></span>
+<span class="w-1 bg-white/20 rounded-full h-2"></span>
+<span class="w-1 bg-white/20 rounded-full h-5"></span>
+<span class="w-1 bg-white/20 rounded-full h-3"></span>
+</div>
+<div class="flex items-center justify-between text-label-sm font-label-sm text-outline mt-1">
+<span>0:14</span>
+<span>0:32</span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-end gap-1 mt-1">
+<span class="font-label-sm text-label-sm text-outline">10:47 AM</span>
+</div>
+</div>
+</div>
+<!-- 5. SENT MESSAGE: Read Receipt Indicators: Double Neon Cyan Glowing Checkmark (✓✓) -->
+<div class="flex justify-end group">
+<div class="max-w-xl">
+<div class="p-4 rounded-3xl rounded-br-sm bg-gradient-to-br from-primary-container/80 via-primary/75 to-inverse-primary/80 backdrop-blur-xl border border-white/25 shadow-xl text-on-primary-container">
+<p class="font-body-md text-body-md leading-relaxed text-white drop-shadow-sm font-medium">
+                Understood! I will calibrate the volumetric glow curve right now. Sending over the updated interactive prototype bundle in 5 minutes! 🚀
+              </p>
+<div class="flex items-center justify-end gap-1.5 mt-1">
+<span class="font-label-sm text-label-sm text-white/80">10:48 AM</span>
+<!-- Read Receipt: Double neon cyan/blue glowing checkmark (✓✓) -->
+<span class="material-symbols-outlined text-[17px] text-secondary glow-cyan" data-icon="done_all" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Typing Indicator Pill -->
+<div class="flex items-center gap-2 text-on-surface-variant font-label-md text-label-md pl-10">
+<div class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-high/50 backdrop-blur-md border border-white/10">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce [animation-delay:0.2s]"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce [animation-delay:0.4s]"></span>
+<span class="ml-1.5 text-secondary font-medium">Elena is typing...</span>
+</div>
+</div>
+</div>
+<!-- GLASSMORPHISM BOTTOM INPUT DOCK -->
+<footer class="fixed bottom-3 md:bottom-4 left-4 right-4 md:left-[350px] lg:left-[410px] z-40">
+<div class="max-w-4xl mx-auto flex items-center gap-2 p-2 rounded-2xl bg-surface-container-high/70 backdrop-blur-2xl border border-white/20 shadow-2xl shadow-surface-container-lowest/90">
+<!-- Emoji Picker Action -->
+<button aria-label="Insert Emoji" class="p-2.5 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-[22px]" data-icon="sentiment_satisfied">sentiment_satisfied</span>
+</button>
+<!-- Plus / Attachment Action -->
+<button aria-label="Attach File" class="p-2.5 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-[22px]" data-icon="attach_file">attach_file</span>
+</button>
+<!-- Input Text Area -->
+<div class="flex-1 min-w-0">
+<input class="w-full bg-transparent border-0 text-on-surface placeholder:text-outline font-body-md text-body-md focus:ring-0 focus:outline-none px-2 py-1.5" id="messageInput" placeholder="Type a message..." type="text"/>
+</div>
+<!-- Dynamic Action Cluster: Voice Memo & Send Button -->
+<div class="flex items-center gap-1.5">
+<!-- Voice Note Mic Button (Glass micro action) -->
+<button aria-label="Record voice note" class="p-2.5 rounded-xl text-on-surface-variant hover:text-secondary hover:bg-white/10 transition-colors" id="micBtn">
+<span class="material-symbols-outlined text-[22px]" data-icon="mic">mic</span>
+</button>
+<!-- Glowing Electric Gradient Send Button with Paper Airplane Icon -->
+<button aria-label="Send message" class="p-2.5 px-3 rounded-xl bg-gradient-to-r from-primary-container via-inverse-primary to-secondary-container text-white shadow-lg glow-violet hover:opacity-95 active:scale-95 transition-all flex items-center justify-center" id="sendBtn">
+<span class="material-symbols-outlined text-[20px]" data-icon="send" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+</footer>
+</main>
+</div>
+<!-- Inline Vanilla Interaction Script for Micro-Interactions -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('messageInput');
+      const micBtn = document.getElementById('micBtn');
+      const sendBtn = document.getElementById('sendBtn');
+
+      // Morphing micro-interaction when text is entered
+      if (input && micBtn && sendBtn) {
+        input.addEventListener('input', (e) => {
+          if (e.target.value.trim().length > 0) {
+            micBtn.classList.add('hidden');
+            sendBtn.classList.add('scale-105');
+          } else {
+            micBtn.classList.remove('hidden');
+            sendBtn.classList.remove('scale-105');
+          }
+        });
+
+        // Trigger message visual feedback on enter
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && input.value.trim().length > 0) {
+            input.value = '';
+            micBtn.classList.remove('hidden');
+            sendBtn.classList.remove('scale-105');
+          }
+        });
+      }
+    });
+  </script>
+</body></html>
