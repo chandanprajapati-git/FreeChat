@@ -80,6 +80,10 @@
 .message-footer-outgoing { justify-content: flex-end; }
 .message-footer-incoming { justify-content: flex-start; }
 .message-footer-row .message-actions { display: flex; align-items: center; margin: 0; }
+.chat-bubble-outgoing,.chat-bubble-incoming { position: relative; padding-right: 30px !important; }
+.chat-bubble-outgoing > .message-actions,.chat-bubble-incoming > .message-actions { position: absolute; top: 3px; right: 3px; z-index: 3; display: flex; align-items: center; margin: 0; }
+.chat-bubble-outgoing > .message-actions .message-menu-trigger,.chat-bubble-incoming > .message-actions .message-menu-trigger { width: 22px; height: 22px; }
+.chat-bubble-outgoing > .message-actions .message-action-menu,.chat-bubble-incoming > .message-actions .message-action-menu { top: calc(100% + 2px); }
 .message-time { opacity: .7; font-size: 9px; line-height: 1; white-space: nowrap; }
 .message-footer-row .message-meta { height: auto; margin: 0 0 0 1px; }
 .call-history-message { display: flex; align-items: center; gap: 10px; min-width: 165px; padding: 3px 2px; }
@@ -1076,4 +1080,36 @@
   .chat-composer-row > .attachment-menu-wrap { flex-basis: 30px !important; width: 30px; }
   .chat-composer-row .composer-tool-button { width: 30px !important; }
   .chat-composer-row > .chat-send-button { flex-basis: 38px !important; width: 38px !important; height: 38px !important; }
+}
+
+/* Keep read receipts unmistakably blue, including on narrow phone layouts. */
+.chat-bubble-outgoing .message-ticks.is-read,
+.chat-bubble-outgoing .message-ticks.is-read path {
+  color: #4db8ff !important;
+  stroke: #4db8ff !important;
+}
+
+@media (max-width: 700px) {
+  .chat-call-actions { flex: 0 0 auto; gap: 7px !important; margin-left: 2px !important; }
+  .chat-call-actions .chat-call-button { flex: 0 0 34px; width: 34px !important; min-width: 34px; height: 34px !important; padding: 5px !important; }
+}
+
+@media (max-width: 360px) {
+  .chat-call-actions { gap: 6px !important; }
+  .chat-call-actions .chat-call-button { flex-basis: 31px; width: 31px !important; min-width: 31px; height: 31px !important; padding: 4px !important; }
+}
+
+.qr-dialog { align-items: center; }
+.qr-dialog .contact-picker-header { width: 100%; align-self: stretch; }
+.my-friend-qr { display: block; width: min(72vw, 280px); height: auto; border: 10px solid #fff; border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.2); image-rendering: pixelated; }
+.qr-account-name { margin-top: 15px; color: rgba(255,255,255,.96); font-size: 15px; }
+.qr-help-text { margin: 10px 0 0; color: rgba(255,255,255,.68); text-align: center; font-size: 12px; line-height: 1.5; }
+.connect-qr-reader { width: min(100%, 360px); min-height: 260px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); border-radius: 14px; background: rgba(255,255,255,.06); }
+.connect-qr-reader video { display: block; width: 100% !important; max-height: 55dvh; object-fit: cover; }
+.connect-qr-reader #qr-shaded-region { border-color: #8bd0ff !important; }
+.connect-qr-reader button { margin: 5px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; color: #fff; background: rgba(255,255,255,.1); }
+.connect-qr-reader select { max-width: 100%; padding: 6px; border-radius: 7px; }
+@media (max-width: 700px) {
+  .connect-qr-reader { min-height: 220px; }
+  .connect-qr-reader video { max-height: 48dvh; }
 }

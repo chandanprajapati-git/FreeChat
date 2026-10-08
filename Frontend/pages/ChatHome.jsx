@@ -24,6 +24,8 @@ import KeyboardArrowDownRounded from "@mui/icons-material/KeyboardArrowDownRound
 import CallRounded from "@mui/icons-material/CallRounded";
 import VideocamRounded from "@mui/icons-material/VideocamRounded";
 import NotificationsNoneRounded from "@mui/icons-material/NotificationsNoneRounded";
+import QrCodeRounded from "@mui/icons-material/QrCodeRounded";
+import QrCodeScannerRounded from "@mui/icons-material/QrCodeScannerRounded";
 
 function MessageTicks({ status }) {
   const isRead = status === "read";
@@ -61,7 +63,7 @@ function ChatHome() {
   });
 
   const [users, setusers] = useState([]);
-  const [profileName] = useState(
+  const [profileName, setProfileName] = useState(
     () => localStorage.getItem("profileName") || "My account",
   );
   const [unreadCounts, setUnreadCounts] = useState({});
@@ -71,6 +73,11 @@ function ChatHome() {
   const [peerDraft, setPeerDraft] = useState("");
   const [socket, setsocket] = useState(null);
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const [myQrOpen, setMyQrOpen] = useState(false);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [myQrImage, setMyQrImage] = useState("");
+  const [qrScanStatus, setQrScanStatus] = useState("");
+  const [qrRequestSending, setQrRequestSending] = useState(false);
   const [requestPanelOpen, setRequestPanelOpen] = useState(false);
   const [friendRequests, setFriendRequests] = useState({ incoming: [], outgoing: [] });
   const [searchResult, setSearchResult] = useState(null);
@@ -118,6 +125,7 @@ function ChatHome() {
   const localStreamRef = useRef(null);
   const pendingIceCandidatesRef = useRef(new Map());
   const typingSequenceRef = useRef(0);
+  const qrScanHandledRef = useRef(false);
   const selectedUserId = selecteduser?._id;
   const selectedUserIdRef = useRef(selectedUserId);
   selectedUserIdRef.current = selectedUserId;
@@ -219,6 +227,43 @@ function ChatHome() {
       await refreshFriendRequests();
     } catch (error) {
       setFriendActionError(error.message);
+    }
+  };
+
+  const handleScannedQr = async (decodedText) => {
+    if (qrScanHandledRef.current || qrRequestSending) return;
+    const match = String(decodedText || "").trim().match(/^connectchat:([a-f\d]{24})$/i);
+    if (!match) {
+      setQrScanStatus("This QR code is not a Connect friend code.");
+      return;
+    }
+    const userId = match[1];
+    if (userId.toLowerCase() === currentUserId.toLowerCase()) {
+      setQrScanStatus("That is your own QR code.");
+      return;
+    }
+
+    qrScanHandledRef.current = true;
+    setQrRequestSending(true);
+    setQrScanStatus("Sending friend request…");
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/friends/requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not send friend request.");
+      setQrScanStatus("Friend request sent. They need to accept it before you can chat.");
+      await refreshFriendRequests();
+    } catch (error) {
+      qrScanHandledRef.current = false;
+      setQrScanStatus(error.message || "Could not send friend request.");
+    } finally {
+      setQrRequestSending(false);
     }
   };
 
@@ -484,6 +529,10 @@ function ChatHome() {
         setMyProfileImage(data.profileImage || "");
         setMyPhone(data.phone || "");
         setPhoneDraft(data.phone || "");
+        if (data.name) {
+          setProfileName(data.name);
+          localStorage.setItem("profileName", data.name);
+        }
       } catch (error) {
         console.log(error);
       }
@@ -1132,6 +1181,57 @@ function ChatHome() {
     };
   }, [socket, selectedUserId, currentUserId]);
 
+  useEffect(() => {
+    let active = true;
+    if (!myQrOpen || !currentUserId) return () => { active = false; };
+    import("qrcode").then(({ default: QRCode }) => QRCode.toDataURL(`connectchat:${currentUserId}`, {
+      width: 280,
+      margin: 2,
+      color: { dark: "#172033", light: "#ffffff" },
+      errorCorrectionLevel: "M",
+    })).then((image) => {
+      if (active) setMyQrImage(image);
+    }).catch(() => {
+      if (active) setQrScanStatus("Could not create your QR code.");
+    });
+    return () => { active = false; };
+  }, [myQrOpen, currentUserId]);
+
+  useEffect(() => {
+    if (!qrScannerOpen) return undefined;
+    let cancelled = false;
+    let scanner;
+    qrScanHandledRef.current = false;
+    setQrScanStatus("Point your camera at a friend’s Connect QR code.");
+    const startScanner = async () => {
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (cancelled) return;
+        scanner = new Html5Qrcode("connect-qr-reader");
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 230, height: 230 }, aspectRatio: 1 },
+          (decodedText) => {
+            if (!cancelled) {
+              void scanner?.stop().catch(() => {});
+              void handleScannedQr(decodedText);
+            }
+          },
+          () => {},
+        );
+      } catch {
+        if (!cancelled) setQrScanStatus("Camera access is unavailable. Allow camera permission and try again.");
+      }
+    };
+    void startScanner();
+    return () => {
+      cancelled = true;
+      if (scanner?.isScanning) {
+        void scanner.stop().then(() => scanner.clear()).catch(() => {});
+      }
+    };
+  }, [qrScannerOpen]);
+
   return (
     <div className="chat-page w-full font-sans">
       <div className="chat-window relative z-10">
@@ -1187,7 +1287,7 @@ function ChatHome() {
               )}
             </Avatar>
             <button className="profile-account-button" type="button" onClick={() => setPhoneDialogOpen(true)}>
-              {myPhone ? "My account" : "Add mobile number"}
+              {myPhone ? (profileName || "My account") : "Add mobile number"}
             </button>
           </div>
         </header>
@@ -1207,6 +1307,16 @@ function ChatHome() {
                 onClick={() => setContactPickerOpen(true)}
               >
                 <GroupAddRounded />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Scan a friend QR code" placement="right">
+              <IconButton className="rail-button" aria-label="Scan a friend QR code" onClick={() => { setQrScanStatus(""); setQrScannerOpen(true); }}>
+                <QrCodeScannerRounded />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Show my QR code" placement="right">
+              <IconButton className="rail-button" aria-label="Show my QR code" onClick={() => { setQrScanStatus(""); setMyQrOpen(true); }}>
+                <QrCodeRounded />
               </IconButton>
             </Tooltip>
             <Tooltip title="Friend requests" placement="right">
@@ -1518,66 +1628,33 @@ function ChatHome() {
                             </>
                             )}
                             {msg.kind !== "call" && (
+                              <div className="message-actions">
+                                <button
+                                  type="button"
+                                  className="message-menu-trigger"
+                                  aria-label="Message actions"
+                                  aria-haspopup="menu"
+                                  aria-expanded={openMessageMenuId === msg._id}
+                                  onClick={() => setOpenMessageMenuId((current) => current === msg._id ? null : msg._id)}
+                                >
+                                  <KeyboardArrowDownRounded fontSize="small" />
+                                </button>
+                                {openMessageMenuId === msg._id && (
+                                  <div className="message-action-menu" role="menu">
+                                    <button type="button" role="menuitem" onClick={() => { setReplyingTo(msg); setOpenMessageMenuId(null); }}>Reply</button>
+                                    {isSentByMe && <>
+                                      <button type="button" role="menuitem" onClick={() => { setMessageActionError(""); setEditingMessageId(msg._id); setEditingText(msg.message); setOpenMessageMenuId(null); }}>Edit</button>
+                                      <button type="button" role="menuitem" onClick={() => { setOpenMessageMenuId(null); deleteMessage(msg._id); }}>Delete</button>
+                                    </>}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {msg.kind !== "call" && (
                             <div className={`message-footer-row ${isSentByMe ? "message-footer-outgoing" : "message-footer-incoming"}`}>
                             <time className="message-time" dateTime={msg.createdAt || undefined} title={msg.createdAt ? new Date(msg.createdAt).toLocaleString() : ""}>
                               {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}
                             </time>
-                            <div className="message-actions">
-                              <button
-                                type="button"
-                                className="message-menu-trigger"
-                                aria-label="Message actions"
-                                aria-haspopup="menu"
-                                aria-expanded={openMessageMenuId === msg._id}
-                                onClick={() =>
-                                  setOpenMessageMenuId((current) =>
-                                    current === msg._id ? null : msg._id,
-                                  )
-                                }
-                              >
-                                <KeyboardArrowDownRounded fontSize="small" />
-                              </button>
-                              {openMessageMenuId === msg._id && (
-                                <div className="message-action-menu" role="menu">
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => {
-                                      setReplyingTo(msg);
-                                      setOpenMessageMenuId(null);
-                                    }}
-                                  >
-                                    Reply
-                                  </button>
-                                  {isSentByMe && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        role="menuitem"
-                                        onClick={() => {
-                                          setMessageActionError("");
-                                          setEditingMessageId(msg._id);
-                                          setEditingText(msg.message);
-                                          setOpenMessageMenuId(null);
-                                        }}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        role="menuitem"
-                                        onClick={() => {
-                                          setOpenMessageMenuId(null);
-                                          deleteMessage(msg._id);
-                                        }}
-                                      >
-                                        Delete
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
                             {isSentByMe && messageActionError && (
                               <p className="message-action-error" role="alert">
                                 {messageActionError}
@@ -1924,6 +2001,35 @@ function ChatHome() {
                 </button>
               )}
             </footer>
+          </section>
+        </div>
+      )}
+      {myQrOpen && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setMyQrOpen(false);
+        }}>
+          <section className="contact-picker qr-dialog" role="dialog" aria-modal="true" aria-labelledby="my-qr-title">
+            <header className="contact-picker-header">
+              <div><p className="chat-overline">CONNECT</p><h2 id="my-qr-title">Your friend QR code</h2><p>Let someone scan this code to send you a friend request.</p></div>
+              <IconButton className="contact-picker-close" aria-label="Close my QR code" onClick={() => setMyQrOpen(false)}><CloseRounded /></IconButton>
+            </header>
+            {myQrImage ? <img className="my-friend-qr" src={myQrImage} alt={`Unique Connect QR code for ${profileName}`} /> : <p className="contact-picker-empty">Creating your QR code…</p>}
+            <strong className="qr-account-name">{profileName}</strong>
+            <p className="qr-help-text">A friend request still needs your approval before messaging can begin.</p>
+          </section>
+        </div>
+      )}
+      {qrScannerOpen && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setQrScannerOpen(false);
+        }}>
+          <section className="contact-picker qr-dialog" role="dialog" aria-modal="true" aria-labelledby="qr-scanner-title">
+            <header className="contact-picker-header">
+              <div><p className="chat-overline">CONNECT</p><h2 id="qr-scanner-title">Scan a friend QR code</h2><p>Allow camera access and point it at their code.</p></div>
+              <IconButton className="contact-picker-close" aria-label="Close QR scanner" onClick={() => setQrScannerOpen(false)}><CloseRounded /></IconButton>
+            </header>
+            <div id="connect-qr-reader" className="connect-qr-reader" />
+            {qrScanStatus && <p className="qr-help-text" role="status">{qrScanStatus}</p>}
           </section>
         </div>
       )}
