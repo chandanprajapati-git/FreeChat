@@ -9,7 +9,7 @@ const receiveMessageFile = (req, res, next) => {
     if (error) {
       return res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({
         message: error.code === "LIMIT_FILE_SIZE"
-          ? "Files must be 20 MB or smaller."
+          ? "Files must be 50 MB or smaller."
           : error.message,
       });
     }

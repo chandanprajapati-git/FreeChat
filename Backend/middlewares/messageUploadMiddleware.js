@@ -11,7 +11,7 @@ const storage = multer.diskStorage({
 });
 
 const allowedMimeTypes = new Set([
-  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/heic", "image/heif",
   "application/pdf", "text/plain", "text/csv",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -24,9 +24,10 @@ const allowedMimeTypes = new Set([
 
 module.exports = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
-    if (allowedMimeTypes.has(file.mimetype)) return callback(null, true);
+    const mobileImageExtension = /\.(heic|heif|avif)$/i.test(file.originalname);
+    if (allowedMimeTypes.has(file.mimetype) || mobileImageExtension) return callback(null, true);
     callback(new Error("Choose an image, document, or audio file of a supported type."));
   },
 });

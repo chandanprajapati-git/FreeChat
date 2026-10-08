@@ -18,6 +18,7 @@ const CALL_EVENTS = {
 };
 
 const activeCalls = new Map();
+const pendingIceByCall = new Map();
 
 const pairKey = (a, b) => [String(a), String(b)].sort().join(":");
 const persistCallRecord = async (call, userA, userB, status, durationSeconds = 0, io, onlineUsers) => {
@@ -65,6 +66,30 @@ const registerCallSignaling = (socket, io, onlineUsers) => {
     if (!fromUserId || !toUserId || !callId || toUserId === fromUserId) return;
 
     let call = activeCalls.get(callId);
+    if (!call && responseEvent === CALL_EVENTS.candidate) {
+      try {
+        const areFriends = await User.exists({ _id: fromUserId, friends: toUserId });
+        if (!areFriends) return;
+      } catch {
+        return;
+      }
+      call = activeCalls.get(callId);
+      if (!call) {
+        const pending = pendingIceByCall.get(callId) || [];
+        if (pending.length < 64) {
+          pending.push({ fromUserId, toUserId, candidate: data.candidate, expiresAt: Date.now() + 20000 });
+          pendingIceByCall.set(callId, pending);
+          setTimeout(() => {
+            const current = pendingIceByCall.get(callId);
+            if (!current) return;
+            const fresh = current.filter((item) => item.expiresAt > Date.now());
+            if (fresh.length) pendingIceByCall.set(callId, fresh);
+            else pendingIceByCall.delete(callId);
+          }, 20000).unref?.();
+        }
+        return;
+      }
+    }
     if (start && !call) {
       try {
         const areFriends = await User.exists({ _id: fromUserId, friends: toUserId });
@@ -91,6 +116,18 @@ const registerCallSignaling = (socket, io, onlineUsers) => {
     }
 
     io.to(peerSocketId).emit(responseEvent, { ...data, callId, fromUserId });
+    if (start) {
+      const pending = pendingIceByCall.get(callId) || [];
+      pendingIceByCall.delete(callId);
+      for (const item of pending) {
+        if (item.toUserId !== toUserId || item.expiresAt <= Date.now()) continue;
+        io.to(peerSocketId).emit(CALL_EVENTS.candidate, {
+          callId,
+          fromUserId: item.fromUserId,
+          candidate: item.candidate,
+        });
+      }
+    }
   };
 
   socket.on(CALL_EVENTS.offer, (data = {}) => {

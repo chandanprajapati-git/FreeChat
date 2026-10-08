@@ -505,6 +505,23 @@
   background: rgba(255,255,255,.07);
 }
 .contact-picker-search::placeholder { color: rgba(255,255,255,.48); }
+.contact-picker .contact-picker-search,
+.contact-picker .contact-picker-search:focus {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  caret-color: #fff;
+  opacity: 1;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.contact-picker .contact-picker-search::placeholder { color: rgba(255,255,255,.72) !important; -webkit-text-fill-color: rgba(255,255,255,.72); opacity: 1; }
+.contact-picker .contact-picker-search:-webkit-autofill,
+.contact-picker .contact-picker-search:-webkit-autofill:hover,
+.contact-picker .contact-picker-search:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff !important;
+  -webkit-box-shadow: 0 0 0 1000px #171b21 inset !important;
+  caret-color: #fff;
+}
 .contact-picker-item:hover { border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.1); box-shadow: 0 0 14px rgba(0,0,0,.16); }
 .contact-picker-avatar { border-color: rgba(255,255,255,.16); color: #fff; background: rgba(255,255,255,.1); }
 .contact-picker-arrow { color: rgba(255,255,255,.66); }

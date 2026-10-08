@@ -697,7 +697,7 @@ function ChatHome() {
   };
 
   const sendMessage = async (text = newMessage, file = null) => {
-    if (!selecteduser || (!text.trim() && !file) || !socket) {
+    if (!selecteduser || (!text.trim() && !file)) {
       return;
     }
     try {
@@ -781,7 +781,10 @@ function ChatHome() {
       .split(",")
       .map((url) => url.trim())
       .filter(Boolean);
-    const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+    const iceServers = [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun.cloudflare.com:3478" },
+    ];
     if (turnUrls.length) {
       iceServers.push({
         urls: turnUrls,
@@ -833,6 +836,7 @@ function ChatHome() {
         }
       } else if (["failed", "closed"].includes(peerConnection.connectionState)) {
         if (callSessionRef.current?.callId === activeCall.callId) {
+          const connectionFailed = peerConnection.connectionState === "failed";
           peerConnectionRef.current.delete(String(peerUserId));
           setRemoteStreams((current) => {
             const next = { ...current };
@@ -842,7 +846,12 @@ function ChatHome() {
           const currentCall = callSessionRef.current;
           const participants = (currentCall.participants || []).filter((id) => String(id) !== String(peerUserId));
           setActiveCall({ ...currentCall, participants });
-          if (participants.length <= 1) cleanupCall();
+          if (participants.length <= 1) {
+            cleanupCall();
+            if (connectionFailed) {
+              setCallNotice("The call could not connect on this network. A TURN relay may be needed for mobile or restricted networks.");
+            }
+          }
         }
       }
     };
@@ -865,9 +874,9 @@ function ChatHome() {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          channelCount: 1,
         },
         video: callType === "video" ? {
+          facingMode: { ideal: "user" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
           frameRate: { ideal: 30, max: 30 },
@@ -911,9 +920,9 @@ function ChatHome() {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          channelCount: 1,
         },
         video: activeCall.callType === "video" ? {
+          facingMode: { ideal: "user" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
           frameRate: { ideal: 30, max: 30 },
@@ -1769,7 +1778,7 @@ function ChatHome() {
                       ref={galleryInputRef}
                       className="visually-hidden-file"
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif,.avif"
                       tabIndex={-1}
                       aria-label="Choose photos from your gallery"
                       onChange={(event) => {
@@ -2072,6 +2081,8 @@ function ChatHome() {
               id="contact-picker-search"
               className="contact-picker-search"
               type="search"
+              inputMode="tel"
+              autoComplete="tel"
               placeholder="Enter mobile number, including country code"
               inputMode="tel"
               value={contactQuery}
