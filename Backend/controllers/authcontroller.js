@@ -4,19 +4,24 @@ const jwt=require('jsonwebtoken')
 
 const registerUser= async (req,res)=>{
 try{
-  const {name,email,password}=req.body;
-  if(!email|| !name||!password){
-    return res.status(400).json({message:"All Fields are Mandatory"})
+  const {name,email,password,phone}=req.body;
+  const normalizedPhone = String(phone || "").replace(/\D/g, "");
+  if(!email|| !name||!password||!normalizedPhone){
+    return res.status(400).json({message:"Name, email, mobile number, and password are required."})
   }
-  const existingUser=await User.findOne({email});
+  if(normalizedPhone.length < 7 || normalizedPhone.length > 15){
+    return res.status(400).json({message:"Enter a valid mobile number with 7 to 15 digits."})
+  }
+  const existingUser=await User.findOne({$or:[{email},{phone:normalizedPhone}]});
   if(existingUser){
-    return res.status(200).json({message:"User already Exist"});
+    return res.status(409).json({message: existingUser.email === email ? "An account with this email already exists." : "An account with this mobile number already exists."});
   }
   const hashedPassword=await bcrypt.hash(password,10);
 
   const user=await User.create({
     name,
     email,
+    phone: normalizedPhone,
     password: hashedPassword
   });
   res.status(201).json({
@@ -24,11 +29,15 @@ try{
     user:{
       id:user._id,
       name: user.name,
-      email:user.email
+      email:user.email,
+      phone:user.phone
     }
   });
 }
 catch (error){
+  if (error.code === 11000) {
+    return res.status(409).json({ message: "An account with this email or mobile number already exists." });
+  }
   res.status(500).json({
     message:"Server Error",
     error: error.message

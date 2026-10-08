@@ -2,11 +2,13 @@ const User=require("../models/User");
 
 const getUsers= async (req,res)=>{
   try{
-    const users= await User.find(
-      {_id:{$ne:req.user}},
-      "name email profileImage isOnline lastSeen"
-    );
-    console.log("BACKEND USERS:", users);
+    const currentUser = await User.findById(req.user).select("friends");
+    const users = currentUser?.friends?.length
+      ? await User.find(
+        { _id: { $in: currentUser.friends } },
+        "name email profileImage isOnline lastSeen",
+      )
+      : [];
     res.status(200).json(users);
   } 
   catch(error){
@@ -21,7 +23,7 @@ const getMyProfile = async (req, res) => {
   try {
     const user = await User.findById(
       req.user,
-      "name email profileImage isOnline lastSeen"
+      "name email phone profileImage isOnline lastSeen"
     );
 
     if (!user) {
@@ -37,6 +39,23 @@ const getMyProfile = async (req, res) => {
       message: "Server error",
       error: error.message
     });
+  }
+};
+
+const updateMyPhone = async (req, res) => {
+  const phone = String(req.body.phone || "").replace(/\D/g, "");
+  if (phone.length < 7 || phone.length > 15) {
+    return res.status(400).json({ message: "Enter a valid mobile number with 7 to 15 digits." });
+  }
+  try {
+    const user = await User.findByIdAndUpdate(req.user, { phone }, { new: true })
+      .select("name email phone profileImage isOnline lastSeen");
+    res.json({ message: "Mobile number saved.", user });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "This mobile number is already linked to another account." });
+    }
+    res.status(500).json({ message: "Could not save mobile number." });
   }
 };
 
@@ -56,7 +75,7 @@ const uploadProfileImage = async (req, res) => {
         profileImage: imageUrl
       },
       { returnDocument: "after" }
-    ).select("name email profileImage isOnline lastSeen");
+    ).select("name email phone profileImage isOnline lastSeen");
 
     if (!user) {
       return res.status(404).json({
@@ -76,4 +95,4 @@ const uploadProfileImage = async (req, res) => {
     });
   }
 };
-module.exports={getUsers,getMyProfile,uploadProfileImage}
+module.exports={getUsers,getMyProfile,uploadProfileImage,updateMyPhone}

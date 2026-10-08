@@ -12,6 +12,10 @@ const userSchema=new mongoose.Schema({
     trim:true,
     unique:true
   },
+  phone: {
+    type: String,
+    trim: true,
+  },
   password:{
     type:String,
     required:true
@@ -28,9 +32,14 @@ const userSchema=new mongoose.Schema({
     type:Date,
     default:null
   },
+  friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 },
   {
     timestamps:true
   }
+);
+userSchema.index(
+  { phone: 1 },
+  { unique: true, partialFilterExpression: { phone: { $type: "string" } } },
 );
 module.exports=mongoose.model("User",userSchema)

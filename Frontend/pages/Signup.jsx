@@ -6,6 +6,7 @@ import Button from '@mui/material/Button';
 function Signup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -20,7 +21,7 @@ function Signup() {
       const response = await fetch('https://freechat-ydqe.onrender.com/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, phone, password }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -40,6 +41,7 @@ function Signup() {
     <form className="auth-form" onSubmit={handleSignup}>
       <AuthField id="name" label="Your name" icon="user" value={name} onChange={(e) => setName(e.target.value)} placeholder="How should we call you?" autoComplete="name"/>
       <AuthField id="email" label="Email address" icon="mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/>
+      <AuthField id="phone" label="Mobile number" icon="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" autoComplete="tel"/>
       <AuthField id="password" label="Create a password" icon="lock" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete="new-password" action={<PasswordAction visible={showPassword} onClick={() => setShowPassword(!showPassword)}/>}/>
       {error && <div className="auth-error" role="alert">{error}</div>}
       <Button className="auth-submit" variant="contained" type="submit" disabled={loading} endIcon={!loading && <Icon name="arrow" size={18}/>}>{loading ? 'Creating your account…' : 'Create account'}</Button>

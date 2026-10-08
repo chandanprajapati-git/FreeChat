@@ -17,11 +17,13 @@ import MoodRounded from "@mui/icons-material/MoodRounded";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import PhotoLibraryOutlined from "@mui/icons-material/PhotoLibraryOutlined";
+import AudioFileRounded from "@mui/icons-material/AudioFileRounded";
 import CloseRounded from "@mui/icons-material/CloseRounded";
 import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
 import KeyboardArrowDownRounded from "@mui/icons-material/KeyboardArrowDownRounded";
 import CallRounded from "@mui/icons-material/CallRounded";
 import VideocamRounded from "@mui/icons-material/VideocamRounded";
+import NotificationsNoneRounded from "@mui/icons-material/NotificationsNoneRounded";
 
 function MessageTicks({ status }) {
   const isRead = status === "read";
@@ -66,14 +68,26 @@ function ChatHome() {
   const [selecteduser, setselecteduser] = useState(null);
   const [messages, setmessages] = useState([]);
   const [newMessage, setnewMessage] = useState("");
+  const [peerDraft, setPeerDraft] = useState("");
   const [socket, setsocket] = useState(null);
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const [requestPanelOpen, setRequestPanelOpen] = useState(false);
+  const [friendRequests, setFriendRequests] = useState({ incoming: [], outgoing: [] });
+  const [searchResult, setSearchResult] = useState(null);
+  const [searchingPeople, setSearchingPeople] = useState(false);
+  const [friendActionError, setFriendActionError] = useState("");
   const [contactQuery, setContactQuery] = useState("");
   const [contactSearch, setContactSearch] = useState("");
   const [messageSearch, setMessageSearch] = useState("");
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [composerError, setComposerError] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [myProfileImage, setMyProfileImage] = useState("");
+  const [myPhone, setMyPhone] = useState("");
+  const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -82,7 +96,8 @@ function ChatHome() {
   const [callNotice, setCallNotice] = useState("");
   const [callSession, setCallSession] = useState(null);
   const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
+  const [remoteStreams, setRemoteStreams] = useState({});
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
 
   const getImageUrl = (imagePath) => {
     if (!imagePath) return "";
@@ -97,24 +112,25 @@ function ChatHome() {
   const messagesEndRef = useRef(null);
   const documentInputRef = useRef(null);
   const galleryInputRef = useRef(null);
-  const peerConnectionRef = useRef(null);
+  const audioInputRef = useRef(null);
+  const peerConnectionRef = useRef(new Map());
   const callSessionRef = useRef(null);
   const localStreamRef = useRef(null);
-  const pendingIceCandidatesRef = useRef([]);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const remoteAudioRef = useRef(null);
+  const pendingIceCandidatesRef = useRef(new Map());
+  const typingSequenceRef = useRef(0);
   const selectedUserId = selecteduser?._id;
   const selectedUserIdRef = useRef(selectedUserId);
   selectedUserIdRef.current = selectedUserId;
   const userIdsKey = users.map((user) => user._id).join(",");
-  const filteredContacts = users.filter((user) =>
-    `${user.name} ${user.email}`
-      .toLowerCase()
-      .includes(contactQuery.trim().toLowerCase()),
-  );
+  const emitTypingUpdate = (toUserId, text) => {
+    socket?.emit("typing:update", {
+      toUserId,
+      text,
+      sequence: ++typingSequenceRef.current,
+    });
+  };
   const visibleUsers = users.filter((user) =>
-    `${user.name} ${user.email}`
+    `${user.name} ${user.email} ${user.phone || ""}`
       .toLowerCase()
       .includes(contactSearch.trim().toLowerCase()),
   );
@@ -128,12 +144,140 @@ function ChatHome() {
     setUnreadCounts((counts) => ({ ...counts, [user._id]: 0 }));
     setMessageSearch("");
     setCallNotice("");
+    setPeerDraft("");
     if (selecteduser?._id !== user._id) {
       setmessages([]);
       setselecteduser(user);
     }
     setContactPickerOpen(false);
     setContactQuery("");
+  };
+
+  const refreshFriendContacts = async () => {
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/users", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!response.ok) return;
+      const contacts = await response.json();
+      setusers(contacts);
+      setselecteduser((current) => current
+        ? contacts.find((user) => String(user._id) === String(current._id)) || null
+        : null);
+    } catch {
+      // The regular contact refresh will retry if the server is temporarily unavailable.
+    }
+  };
+
+  const refreshFriendRequests = async () => {
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/friends/requests", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (response.ok) setFriendRequests(await response.json());
+    } catch {
+      // Keep the last request list visible while offline.
+    }
+  };
+
+  const savePhoneNumber = async (event) => {
+    event.preventDefault();
+    setPhoneError("");
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/users/phone", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ phone: phoneDraft }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not save mobile number.");
+      setMyPhone(data.user.phone);
+      setPhoneDraft(data.user.phone);
+      setPhoneDialogOpen(false);
+    } catch (error) {
+      setPhoneError(error.message);
+    }
+  };
+
+  const sendFriendRequest = async (user) => {
+    setFriendActionError("");
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/friends/requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ userId: user._id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not send request.");
+      setSearchResult((current) => current ? { ...current, relationship: "outgoing" } : current);
+      await refreshFriendRequests();
+    } catch (error) {
+      setFriendActionError(error.message);
+    }
+  };
+
+  const acceptFriendRequest = async (requestId, friend) => {
+    setFriendActionError("");
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/friends/requests/${requestId}/accept`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not accept request.");
+      setSearchResult((current) => current ? { ...current, relationship: "friends" } : current);
+      setFriendRequests((current) => ({
+        ...current,
+        incoming: current.incoming.filter((item) => String(item._id) !== String(requestId)),
+      }));
+      await refreshFriendContacts();
+      await refreshFriendRequests();
+      if (friend) setusers((current) => current.some((item) => String(item._id) === String(friend._id)) ? current : [...current, friend]);
+    } catch (error) {
+      setFriendActionError(error.message);
+    }
+  };
+
+  const rejectFriendRequest = async (requestId) => {
+    setFriendActionError("");
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/friends/requests/${requestId}/reject`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not decline request.");
+      setFriendRequests((current) => ({
+        ...current,
+        incoming: current.incoming.filter((item) => String(item._id) !== String(requestId)),
+      }));
+    } catch (error) {
+      setFriendActionError(error.message);
+    }
+  };
+
+  const unfriend = async (friend) => {
+    if (!window.confirm(`Remove ${friend.name} from your friends?`)) return;
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/friends/${friend._id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not remove friend.");
+      if (callSessionRef.current?.peerUserId === String(friend._id)) endCall(true);
+      setselecteduser(null);
+      setmessages([]);
+      await refreshFriendContacts();
+    } catch (error) {
+      setFriendActionError(error.message);
+    }
   };
 
   useEffect(() => {
@@ -148,6 +292,57 @@ function ChatHome() {
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [contactPickerOpen]);
+
+  useEffect(() => {
+    const digits = contactQuery.replace(/\D/g, "");
+    setSearchResult(null);
+    setFriendActionError("");
+    if (digits.length < 7) {
+      setSearchingPeople(false);
+      return undefined;
+    }
+    setSearchingPeople(true);
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`https://freechat-ydqe.onrender.com/api/friends/search?phone=${encodeURIComponent(digits)}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          setSearchResult({ error: result.message || "No account found with that number." });
+        } else {
+          setSearchResult(result);
+        }
+      } catch {
+        setSearchResult({ error: "Could not search right now. Check your connection." });
+      } finally {
+        setSearchingPeople(false);
+      }
+    }, 350);
+    return () => window.clearTimeout(timeoutId);
+  }, [contactQuery]);
+
+  useEffect(() => {
+    refreshFriendRequests();
+    const refreshInterval = window.setInterval(refreshFriendRequests, 15000);
+    const onFriendRequestChange = () => refreshFriendRequests();
+    const onFriendshipRemoved = ({ userId }) => {
+      if (String(selectedUserIdRef.current) === String(userId)) {
+        if (callSessionRef.current?.peerUserId === String(userId)) endCall(true);
+        setmessages([]);
+      }
+      refreshFriendContacts();
+    };
+    socket?.on("friendRequestReceived", onFriendRequestChange);
+    socket?.on("friendRequestUpdated", onFriendRequestChange);
+    socket?.on("friendshipRemoved", onFriendshipRemoved);
+    return () => {
+      window.clearInterval(refreshInterval);
+      socket?.off("friendRequestReceived", onFriendRequestChange);
+      socket?.off("friendRequestUpdated", onFriendRequestChange);
+      socket?.off("friendshipRemoved", onFriendshipRemoved);
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (!userIdsKey) return undefined;
@@ -212,7 +407,7 @@ function ChatHome() {
         setusers(data);
         setselecteduser((currentUser) =>
           currentUser
-            ? data.find((user) => user._id === currentUser._id) || currentUser
+            ? data.find((user) => user._id === currentUser._id) || null
             : currentUser,
         );
       } catch (error) {
@@ -228,6 +423,41 @@ function ChatHome() {
       window.removeEventListener("focus", fetchUsers);
     };
   }, []);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onPresenceUpdate = ({ userId, isOnline, lastSeen }) => {
+      const normalizedUserId = String(userId);
+      const updatePresence = (user) =>
+        String(user._id) === normalizedUserId
+          ? { ...user, isOnline, ...(lastSeen ? { lastSeen } : {}) }
+          : user;
+
+      setusers((currentUsers) => currentUsers.map(updatePresence));
+      setselecteduser((currentUser) =>
+        currentUser ? updatePresence(currentUser) : currentUser,
+      );
+    };
+
+    socket.on("presenceUpdate", onPresenceUpdate);
+    return () => socket.off("presenceUpdate", onPresenceUpdate);
+  }, [socket]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onTypingUpdate = ({ fromUserId, text }) => {
+      if (String(fromUserId) === String(selectedUserIdRef.current)) {
+        setPeerDraft(String(text || ""));
+      }
+    };
+    socket.on("typing:update", onTypingUpdate);
+    return () => socket.off("typing:update", onTypingUpdate);
+  }, [socket]);
+
+  useEffect(() => {
+    if (!socket || !selectedUserId) return undefined;
+    return () => emitTypingUpdate(selectedUserId, "");
+  }, [socket, selectedUserId]);
 
   useEffect(() => {
     const fetchMyProfile = async () => {
@@ -252,6 +482,8 @@ function ChatHome() {
         }
 
         setMyProfileImage(data.profileImage || "");
+        setMyPhone(data.phone || "");
+        setPhoneDraft(data.phone || "");
       } catch (error) {
         console.log(error);
       }
@@ -415,34 +647,43 @@ function ChatHome() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!selecteduser || !newMessage.trim() || !socket) {
+  const sendMessage = async (text = newMessage, file = null) => {
+    if (!selecteduser || (!text.trim() && !file) || !socket) {
       return;
     }
     try {
+      setComposerError("");
       const token = localStorage.getItem("token");
+      const body = file ? new FormData() : JSON.stringify({
+        receiverId: selecteduser._id,
+        message: text,
+        replyTo: replyingTo?._id || null,
+      });
+      if (file) {
+        body.append("receiverId", selecteduser._id);
+        body.append("message", text);
+        body.append("replyTo", replyingTo?._id || "");
+        body.append("file", file);
+      }
       const response = await fetch("https://freechat-ydqe.onrender.com/api/messages", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          ...(file ? {} : { "Content-Type": "application/json" }),
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          receiverId: selecteduser._id,
-          message: newMessage,
-          replyTo: replyingTo?._id || null,
-        }),
+        body,
       });
       const data = await response.json();
       if (!response.ok) {
-        console.log(data.message);
+        setComposerError(data.message || "Could not send this message.");
         return;
       }
       setmessages((prevMessages) => [...prevMessages, data.data]);
       setnewMessage("");
+      emitTypingUpdate(selecteduser._id, "");
       setReplyingTo(null);
     } catch (error) {
-      console.log(error);
+      setComposerError(error.message || "Could not send this message. Check your connection and try again.");
     }
   };
 
@@ -456,14 +697,14 @@ function ChatHome() {
   };
 
   const cleanupCall = () => {
-    const peerConnection = peerConnectionRef.current;
-    peerConnectionRef.current = null;
-    peerConnection?.close();
+    peerConnectionRef.current.forEach((peerConnection) => peerConnection.close());
+    peerConnectionRef.current.clear();
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     setLocalStream(null);
-    setRemoteStream(null);
-    pendingIceCandidatesRef.current = [];
+    setRemoteStreams({});
+    pendingIceCandidatesRef.current.clear();
+    setAddParticipantOpen(false);
     setActiveCall(null);
   };
 
@@ -478,36 +719,61 @@ function ChatHome() {
     cleanupCall();
   };
 
-  const flushIceCandidates = async (peerConnection) => {
-    const queuedCandidates = pendingIceCandidatesRef.current;
-    pendingIceCandidatesRef.current = [];
+  const flushIceCandidates = async (peerConnection, peerUserId) => {
+    const queuedCandidates = pendingIceCandidatesRef.current.get(peerUserId) || [];
+    pendingIceCandidatesRef.current.delete(peerUserId);
     for (const candidate of queuedCandidates) {
       await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
     }
   };
 
-  const createPeerConnection = (activeCall, stream) => {
-    const peerConnection = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  const createPeerConnection = async (activeCall, stream, peerUserId = activeCall.peerUserId) => {
+    const turnUrls = (import.meta.env.VITE_TURN_URLS || "")
+      .split(",")
+      .map((url) => url.trim())
+      .filter(Boolean);
+    const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+    if (turnUrls.length) {
+      iceServers.push({
+        urls: turnUrls,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_CREDENTIAL,
+      });
+    }
+    const peerConnection = new RTCPeerConnection({ iceServers });
+    peerConnectionRef.current.set(String(peerUserId), peerConnection);
+    const senders = stream.getTracks().map((track) => {
+      track.contentHint = track.kind === "audio" ? "speech" : "motion";
+      return peerConnection.addTrack(track, stream);
     });
-    peerConnectionRef.current = peerConnection;
-    stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+    await Promise.all(senders.map(async (sender) => {
+      const parameters = sender.getParameters();
+      parameters.encodings = parameters.encodings?.length ? parameters.encodings : [{}];
+      parameters.encodings[0].maxBitrate = sender.track.kind === "audio" ? 128000 : 1800000;
+      if (sender.track.kind === "video") parameters.encodings[0].maxFramerate = 30;
+      parameters.encodings[0].priority = "high";
+      try {
+        await sender.setParameters(parameters);
+      } catch {
+        // Some browsers do not allow sender tuning; WebRTC still negotiates normally.
+      }
+    }));
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         socket?.emit("call:ice-candidate", {
-          toUserId: activeCall.peerUserId,
+          toUserId: String(peerUserId),
           callId: activeCall.callId,
           candidate: event.candidate,
         });
       }
     };
     peerConnection.ontrack = (event) => {
-      setRemoteStream((currentStream) => {
-        const streamToUse = currentStream || new MediaStream();
+      setRemoteStreams((currentStream) => {
+        const streamToUse = currentStream[String(peerUserId)] || new MediaStream();
         if (!streamToUse.getTracks().some((track) => track.id === event.track.id)) {
           streamToUse.addTrack(event.track);
         }
-        return streamToUse;
+        return { ...currentStream, [String(peerUserId)]: streamToUse };
       });
     };
     peerConnection.onconnectionstatechange = () => {
@@ -517,7 +783,18 @@ function ChatHome() {
           setActiveCall({ ...currentCall, status: "connected" });
         }
       } else if (["failed", "closed"].includes(peerConnection.connectionState)) {
-        if (callSessionRef.current?.callId === activeCall.callId) cleanupCall();
+        if (callSessionRef.current?.callId === activeCall.callId) {
+          peerConnectionRef.current.delete(String(peerUserId));
+          setRemoteStreams((current) => {
+            const next = { ...current };
+            delete next[String(peerUserId)];
+            return next;
+          });
+          const currentCall = callSessionRef.current;
+          const participants = (currentCall.participants || []).filter((id) => String(id) !== String(peerUserId));
+          setActiveCall({ ...currentCall, participants });
+          if (participants.length <= 1) cleanupCall();
+        }
       }
     };
     return peerConnection;
@@ -535,8 +812,17 @@ function ChatHome() {
     try {
       setCallNotice("");
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: callType === "video",
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+        video: callType === "video" ? {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 30 },
+        } : false,
       });
       localStreamRef.current = stream;
       setLocalStream(stream);
@@ -547,9 +833,10 @@ function ChatHome() {
         callType,
         status: "calling",
         isCaller: true,
+        participants: [currentUserId, String(selecteduser._id)],
       };
       setActiveCall(activeCall);
-      const peerConnection = createPeerConnection(activeCall, stream);
+      const peerConnection = await createPeerConnection(activeCall, stream);
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
       socket.emit("call:offer", {
@@ -568,17 +855,34 @@ function ChatHome() {
 
   const acceptCall = async () => {
     const activeCall = callSessionRef.current;
-    if (!activeCall?.offer) return;
+    if (!activeCall?.offer && !activeCall?.groupInvite) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: activeCall.callType === "video",
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+        video: activeCall.callType === "video" ? {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 30 },
+        } : false,
       });
       localStreamRef.current = stream;
       setLocalStream(stream);
-      const peerConnection = createPeerConnection(activeCall, stream);
+      if (activeCall.groupInvite) {
+        setActiveCall({ ...activeCall, status: "connecting", participants: activeCall.participants || [] });
+        socket.emit("call:join", {
+          callId: activeCall.callId,
+          toUserId: activeCall.peerUserId,
+        });
+        return;
+      }
+      const peerConnection = await createPeerConnection(activeCall, stream);
       await peerConnection.setRemoteDescription(new RTCSessionDescription(activeCall.offer));
-      await flushIceCandidates(peerConnection);
+      await flushIceCandidates(peerConnection, activeCall.peerUserId);
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       socket.emit("call:answer", {
@@ -586,7 +890,7 @@ function ChatHome() {
         callId: activeCall.callId,
         answer: peerConnection.localDescription,
       });
-      setActiveCall({ ...activeCall, status: "connecting", offer: null });
+      setActiveCall({ ...activeCall, status: "connecting", offer: null, participants: [currentUserId, activeCall.peerUserId] });
     } catch (error) {
       endCall(true, "call:reject");
       setCallNotice(error.name === "NotAllowedError"
@@ -594,12 +898,6 @@ function ChatHome() {
         : "Could not answer the call.");
     }
   };
-
-  useEffect(() => {
-    if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
-    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStream;
-  }, [localStream, remoteStream, callSession]);
 
   useEffect(() => {
     if (!callSession || callSession.status !== "calling") return undefined;
@@ -614,8 +912,32 @@ function ChatHome() {
 
   useEffect(() => {
     if (!socket) return undefined;
+    const handlePeerOffer = async (data) => {
+      const activeCall = callSessionRef.current;
+      const peerUserId = String(data.fromUserId);
+      if (!activeCall || activeCall.callId !== data.callId || !localStreamRef.current || peerConnectionRef.current.has(peerUserId)) return;
+      try {
+        const peerConnection = await createPeerConnection(activeCall, localStreamRef.current, peerUserId);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        await flushIceCandidates(peerConnection, peerUserId);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.emit("call:answer", {
+          toUserId: peerUserId,
+          callId: activeCall.callId,
+          answer: peerConnection.localDescription,
+        });
+      } catch {
+        setCallNotice(`Could not connect to ${getCallName(peerUserId)}.`);
+      }
+    };
     const onIncomingCall = (data) => {
-      if (callSessionRef.current) {
+      const currentCall = callSessionRef.current;
+      if (currentCall?.callId === data.callId && data.offer) {
+        void handlePeerOffer(data);
+        return;
+      }
+      if (currentCall) {
         socket.emit("call:reject", {
           toUserId: data.fromUserId,
           callId: data.callId,
@@ -631,15 +953,17 @@ function ChatHome() {
         status: "incoming",
         isCaller: false,
         offer: data.offer,
+        groupInvite: Boolean(data.groupInvite),
+        participants: data.participants || [currentUserId, String(data.fromUserId)],
       });
     };
     const onCallAnswered = async (data) => {
       const activeCall = callSessionRef.current;
-      const peerConnection = peerConnectionRef.current;
+      const peerConnection = peerConnectionRef.current.get(String(data.fromUserId));
       if (!activeCall || activeCall.callId !== data.callId || !peerConnection) return;
       try {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        await flushIceCandidates(peerConnection);
+        await flushIceCandidates(peerConnection, String(data.fromUserId));
         setActiveCall({ ...activeCall, status: "connecting" });
       } catch {
         setCallNotice("Could not connect the call.");
@@ -648,10 +972,13 @@ function ChatHome() {
     };
     const onIceCandidate = async (data) => {
       const activeCall = callSessionRef.current;
-      const peerConnection = peerConnectionRef.current;
       if (!activeCall || activeCall.callId !== data.callId || !data.candidate) return;
+      const peerUserId = String(data.fromUserId);
+      const peerConnection = peerConnectionRef.current.get(peerUserId);
       if (!peerConnection?.remoteDescription) {
-        pendingIceCandidatesRef.current.push(data.candidate);
+        const pending = pendingIceCandidatesRef.current.get(peerUserId) || [];
+        pending.push(data.candidate);
+        pendingIceCandidatesRef.current.set(peerUserId, pending);
         return;
       }
       try {
@@ -661,18 +988,57 @@ function ChatHome() {
       }
     };
     const onCallRejected = (data) => {
-      if (callSessionRef.current?.callId !== data.callId) return;
-      const peerName = callSessionRef.current.peerName;
-      cleanupCall();
-      setCallNotice(`${peerName || "Contact"} declined the call.`);
+      const activeCall = callSessionRef.current;
+      if (activeCall?.callId !== data.callId) return;
+      if (String(activeCall.peerUserId) === String(data.fromUserId)) {
+        cleanupCall();
+        setCallNotice(`${activeCall.peerName || "Contact"} declined the call.`);
+      } else {
+        setCallNotice(`${getCallName(data.fromUserId)} declined the invitation.`);
+      }
     };
     const onCallEnded = (data) => {
-      if (callSessionRef.current?.callId === data.callId) cleanupCall();
+      const activeCall = callSessionRef.current;
+      if (activeCall?.callId !== data.callId) return;
+      const peerUserId = String(data.fromUserId || activeCall.peerUserId);
+      peerConnectionRef.current.get(peerUserId)?.close();
+      peerConnectionRef.current.delete(peerUserId);
+      pendingIceCandidatesRef.current.delete(peerUserId);
+      setRemoteStreams((current) => {
+        const next = { ...current };
+        delete next[peerUserId];
+        return next;
+      });
+      const participants = (activeCall.participants || []).filter((id) => String(id) !== peerUserId);
+      setActiveCall({ ...activeCall, participants });
+      if (participants.length <= 1) cleanupCall();
     };
     const onCallUnavailable = (data) => {
       if (callSessionRef.current?.callId !== data.callId) return;
-      cleanupCall();
-      setCallNotice("That person is offline and can’t receive a call right now.");
+      const reason = data.reason === "full" ? "This call already has the maximum number of people." : data.reason === "not-friends" ? "Calls are available between friends." : data.reason === "ended" ? "This call has already ended." : data.reason === "server-error" ? "Could not join this call. Try again." : "That person is offline and can’t receive a call right now.";
+      if (callSessionRef.current?.status === "calling" || callSessionRef.current?.groupInvite) cleanupCall();
+      setCallNotice(reason);
+    };
+    const onParticipantJoined = async (data) => {
+      const activeCall = callSessionRef.current;
+      if (!activeCall || activeCall.callId !== data.callId) return;
+      setActiveCall({ ...activeCall, participants: data.participants });
+      if (String(data.joinedUserId) === currentUserId || !localStreamRef.current) return;
+      const peerUserId = String(data.joinedUserId);
+      if (peerConnectionRef.current.has(peerUserId)) return;
+      try {
+        const peerConnection = await createPeerConnection(activeCall, localStreamRef.current, peerUserId);
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        socket.emit("call:offer", {
+          toUserId: peerUserId,
+          callId: activeCall.callId,
+          callType: activeCall.callType,
+          offer: peerConnection.localDescription,
+        });
+      } catch {
+        setCallNotice(`Could not invite ${getCallName(peerUserId)} into the call.`);
+      }
     };
     socket.on("call:incoming", onIncomingCall);
     socket.on("call:answered", onCallAnswered);
@@ -680,6 +1046,7 @@ function ChatHome() {
     socket.on("call:rejected", onCallRejected);
     socket.on("call:ended", onCallEnded);
     socket.on("call:unavailable", onCallUnavailable);
+    socket.on("call:participant-joined", onParticipantJoined);
     return () => {
       socket.off("call:incoming", onIncomingCall);
       socket.off("call:answered", onCallAnswered);
@@ -687,6 +1054,7 @@ function ChatHome() {
       socket.off("call:rejected", onCallRejected);
       socket.off("call:ended", onCallEnded);
       socket.off("call:unavailable", onCallUnavailable);
+      socket.off("call:participant-joined", onParticipantJoined);
     };
   }, [socket, users, selecteduser]);
 
@@ -712,8 +1080,15 @@ function ChatHome() {
   useEffect(() => {
     if (!socket) return;
     socket.on("receiveMessage", (data) => {
-      socket.emit("messageDelivered", { messageId: data._id });
       const senderId = String(data.sender?._id || data.sender);
+      if (senderId === String(currentUserId)) {
+        const receiverId = String(data.receiver?._id || data.receiver);
+        if (receiverId === String(selectedUserId)) {
+          setmessages((prevMessages) => prevMessages.some((message) => message._id === data._id) ? prevMessages : [...prevMessages, data]);
+        }
+        return;
+      }
+      socket.emit("messageDelivered", { messageId: data._id });
       if (senderId !== String(selectedUserId)) {
         setUnreadCounts((counts) => ({
           ...counts,
@@ -755,7 +1130,7 @@ function ChatHome() {
       socket.off("receiveMessage");
       socket.off("messageStatusUpdated");
     };
-  }, [socket, selectedUserId]);
+  }, [socket, selectedUserId, currentUserId]);
 
   return (
     <div className="chat-page w-full font-sans">
@@ -811,7 +1186,9 @@ function ChatHome() {
                 profileName.trim().charAt(0).toUpperCase() || "M"
               )}
             </Avatar>
-            <span>My account</span>
+            <button className="profile-account-button" type="button" onClick={() => setPhoneDialogOpen(true)}>
+              {myPhone ? "My account" : "Add mobile number"}
+            </button>
           </div>
         </header>
         <div
@@ -831,6 +1208,20 @@ function ChatHome() {
               >
                 <GroupAddRounded />
               </IconButton>
+            </Tooltip>
+            <Tooltip title="Friend requests" placement="right">
+              <span className="rail-notification-wrap">
+                <IconButton
+                  className="rail-button"
+                  aria-label={`Friend requests${friendRequests.incoming.length ? `, ${friendRequests.incoming.length} pending` : ""}`}
+                  onClick={() => setRequestPanelOpen(true)}
+                >
+                  <NotificationsNoneRounded />
+                </IconButton>
+                {friendRequests.incoming.length > 0 && (
+                  <span className="rail-notification-badge">{friendRequests.incoming.length > 99 ? "99+" : friendRequests.incoming.length}</span>
+                )}
+              </span>
             </Tooltip>
             <Tooltip title="Sign out" placement="right">
               <IconButton
@@ -1049,12 +1440,22 @@ function ChatHome() {
                                 : "chat-bubble-incoming rounded-[18px] px-3.5 py-2"
                             }`}
                           >
+                            {msg.kind === "call" ? (
+                              <div className="call-history-message">
+                                <span className="call-history-icon" aria-hidden="true">{msg.call?.type === "video" ? "▣" : "☎"}</span>
+                                <div>
+                                  <strong>{msg.call?.status === "completed" ? `${isSentByMe ? "Outgoing" : "Incoming"} ${msg.call?.type || "audio"} call` : `${msg.call?.status === "missed" || msg.call?.status === "unanswered" ? "Missed" : "Declined"} ${msg.call?.type || "audio"} call`}</strong>
+                                  {msg.call?.status === "completed" && <span>{Math.floor((msg.call.durationSeconds || 0) / 60)}:{String((msg.call.durationSeconds || 0) % 60).padStart(2, "0")}</span>}
+                                </div>
+                              </div>
+                            ) : (
+                            <>
                             {msg.replyTo && (
-  <div className="message-reply-preview">
-    <strong>Replying to</strong>
-    <p>{msg.replyTo.message}</p>
-  </div>
-)}
+                              <div className="message-reply-preview">
+                                <strong>Replying to</strong>
+                                <p>{msg.replyTo.message}</p>
+                              </div>
+                            )}
                             {editingMessageId === msg._id ? (
                               <div className="edit-message-box">
                                 <input
@@ -1092,10 +1493,35 @@ function ChatHome() {
                                 </button>
                               </div>
                             ) : (
-                              <p className="text-[15px] leading-[1.3] font-normal">
-                                {msg.message}
-                              </p>
+                              <>
+                              {msg.attachment && (
+                                <div className="message-attachment">
+                                  {msg.attachment.mimeType?.startsWith("image/") ? (
+                                    <a href={getImageUrl(msg.attachment.url)} target="_blank" rel="noreferrer">
+                                      <img className="message-attachment-image" src={getImageUrl(msg.attachment.url)} alt={msg.attachment.name} />
+                                    </a>
+                                  ) : msg.attachment.mimeType?.startsWith("audio/") ? (
+                                    <audio className="message-attachment-audio" controls preload="metadata" src={getImageUrl(msg.attachment.url)} />
+                                  ) : (
+                                    <a className="message-attachment-file" href={getImageUrl(msg.attachment.url)} target="_blank" rel="noreferrer" download={msg.attachment.name}>
+                                      <DescriptionOutlined />
+                                      <span>{msg.attachment.name}</span>
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                              {msg.message && (!msg.attachment || msg.message !== msg.attachment.name) && (
+                                <p className="text-[15px] leading-[1.3] font-normal">{msg.message}</p>
+                              )}
+                              </>
                             )}
+                            </>
+                            )}
+                            {msg.kind !== "call" && (
+                            <div className={`message-footer-row ${isSentByMe ? "message-footer-outgoing" : "message-footer-incoming"}`}>
+                            <time className="message-time" dateTime={msg.createdAt || undefined} title={msg.createdAt ? new Date(msg.createdAt).toLocaleString() : ""}>
+                              {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}
+                            </time>
                             <div className="message-actions">
                               <button
                                 type="button"
@@ -1162,6 +1588,9 @@ function ChatHome() {
                                 <MessageTicks status={msg.status} />
                               </div>
                             )}
+                            </div>
+                            )}
+                            {msg.kind === "call" && msg.createdAt && <time className="message-time call-history-time" dateTime={msg.createdAt}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>}
                           </div>
                         </div>
                       );
@@ -1185,6 +1614,12 @@ function ChatHome() {
                     >
                       ×
                     </button>
+                  </div>
+                )}
+                {peerDraft && (
+                  <div className="live-draft-preview" aria-live="polite">
+                    <strong>{selecteduser.name} is typing</strong>
+                    <p>{peerDraft}</p>
                   </div>
                 )}
                 <div className="chat-composer-row flex items-center w-full gap-2">
@@ -1221,6 +1656,17 @@ function ChatHome() {
                           role="menuitem"
                           onClick={() => {
                             setAttachmentMenuOpen(false);
+                            audioInputRef.current?.click();
+                          }}
+                        >
+                          <AudioFileRounded />
+                          Audio
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setAttachmentMenuOpen(false);
                             galleryInputRef.current?.click();
                           }}
                         >
@@ -1236,25 +1682,52 @@ function ChatHome() {
                       accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv"
                       tabIndex={-1}
                       aria-label="Choose a document"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) sendMessage(newMessage, file);
+                        event.target.value = "";
+                      }}
                     />
                     <input
                       ref={galleryInputRef}
                       className="visually-hidden-file"
                       type="file"
                       accept="image/*"
-                      multiple
                       tabIndex={-1}
                       aria-label="Choose photos from your gallery"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) sendMessage(newMessage, file);
+                        event.target.value = "";
+                      }}
+                    />
+                    <input
+                      ref={audioInputRef}
+                      className="visually-hidden-file"
+                      type="file"
+                      accept="audio/*"
+                      tabIndex={-1}
+                      aria-label="Choose an audio file"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) sendMessage(newMessage, file);
+                        event.target.value = "";
+                      }}
                     />
                   </div>
                   <div className="chat-composer-input-wrap flex-1 relative">
                     <input
                       type="text"
+                      maxLength={1000}
                       placeholder="Write a message..."
                       aria-label="Write a message"
                       className="chat-message-input w-full rounded-full py-3 pl-4 pr-12 text-sm focus:outline-none"
                       value={newMessage}
-                      onChange={(event) => setnewMessage(event.target.value)}
+                      onChange={(event) => {
+                        const text = event.target.value;
+                        setnewMessage(text);
+                        emitTypingUpdate(selecteduser._id, text);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1265,18 +1738,31 @@ function ChatHome() {
                     <IconButton
                       className="emoji-button absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
                       aria-label="Emoji"
+                      aria-expanded={emojiPickerOpen}
+                      onClick={() => setEmojiPickerOpen((open) => !open)}
                     >
                       <MoodRounded />
                     </IconButton>
+                    {emojiPickerOpen && (
+                      <div className="emoji-picker" role="listbox" aria-label="Choose an emoji">
+                        {["😀", "😂", "🥰", "😍", "😊", "😉", "😎", "😭", "😮", "😢", "❤️", "👍", "🙏", "🎉", "🔥", "✨"].map((emoji) => (
+                          <button key={emoji} type="button" role="option" aria-label={`Insert ${emoji}`} onClick={() => {
+                            setnewMessage((current) => `${current}${emoji}`);
+                            setEmojiPickerOpen(false);
+                          }}>{emoji}</button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <IconButton
-                    onClick={sendMessage}
+                    onClick={() => sendMessage()}
                     className="chat-send-button ml-1"
                     aria-label="Send message"
                   >
                     <SendRounded />
                   </IconButton>
                 </div>
+                {composerError && <p className="composer-error" role="alert">{composerError}</p>}
               </>
             ) : (
               <div className="chat-empty flex flex-col items-center justify-center h-full">
@@ -1336,6 +1822,9 @@ function ChatHome() {
                       {selecteduser.isOnline ? "Available" : "Offline"}
                     </strong>
                   </div>
+                  <button className="unfriend-button" type="button" onClick={() => unfriend(selecteduser)}>
+                    Remove friend
+                  </button>
                 </div>
               </div>
             ) : (
@@ -1357,31 +1846,46 @@ function ChatHome() {
             <header className="call-dialog-header">
               <div>
                 <h2 id="call-dialog-title">
-                  {callSession.callType === "video" ? "Video call" : "Voice call"}
+                  {callSession.callType === "video" ? "Video call" : "Voice call"}{(callSession.participants?.length || 0) > 2 ? ` · ${callSession.participants.length} people` : ""}
                 </h2>
                 <p>{callSession.peerName}</p>
               </div>
-              <span className={`call-state-pill ${callSession.status}`}>
-                {callSession.status === "incoming"
-                  ? "Incoming call"
-                  : callSession.status === "calling"
-                    ? "Calling…"
-                    : callSession.status === "connected"
-                      ? "Connected"
-                      : "Connecting…"}
-              </span>
+              <div className="call-dialog-header-actions">
+                {callSession.status === "connected" && (
+                  <div className="call-add-participant-wrap">
+                    <button type="button" className="call-add-participant" disabled={(callSession.participants?.length || 0) >= 4} onClick={() => setAddParticipantOpen((open) => !open)}>
+                      <GroupAddRounded fontSize="small" /> Add friend
+                    </button>
+                    {addParticipantOpen && (
+                      <div className="call-participant-menu" role="menu" aria-label="Add a friend to this call">
+                        {users.filter((user) => !callSession.participants?.some((id) => String(id) === String(user._id))).map((user) => (
+                          <button key={user._id} type="button" role="menuitem" onClick={() => {
+                            socket?.emit("call:add-participant", { callId: callSession.callId, toUserId: user._id });
+                            setAddParticipantOpen(false);
+                            setCallNotice(`Inviting ${user.name}…`);
+                          }}>{user.name}</button>
+                        ))}
+                        {!users.some((user) => !callSession.participants?.some((id) => String(id) === String(user._id))) && <span>No more friends to add.</span>}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <span className={`call-state-pill ${callSession.status}`}>
+                  {callSession.status === "incoming" ? "Incoming call" : callSession.status === "calling" ? "Calling…" : callSession.status === "connected" ? "Connected" : "Connecting…"}
+                </span>
+              </div>
             </header>
+            {callNotice && <p className="call-dialog-notice" role="status">{callNotice}</p>}
             {callSession.callType === "video" ? (
-              <div className="call-video-stage">
-                <video ref={remoteVideoRef} autoPlay playsInline />
-                <video
-                  ref={localVideoRef}
-                  className="call-local-video"
-                  autoPlay
-                  muted
-                  playsInline
-                />
-                {!remoteStream && (
+              <div className={`call-video-stage${(callSession.participants?.length || 0) > 2 ? " is-group-call" : ""}`}>
+                {Object.entries(remoteStreams).map(([userId, stream]) => (
+                  <div className="call-video-tile" key={userId}>
+                    <video className="call-remote-video" ref={(element) => { if (element && element.srcObject !== stream) element.srcObject = stream; }} autoPlay playsInline />
+                    <span>{getCallName(userId)}</span>
+                  </div>
+                ))}
+                {localStream && <video className="call-local-video" ref={(element) => { if (element && element.srcObject !== localStream) element.srcObject = localStream; }} autoPlay muted playsInline />}
+                {!Object.keys(remoteStreams).length && (
                   <div className="call-video-placeholder">
                     <Avatar>{callSession.peerName.charAt(0).toUpperCase()}</Avatar>
                     <span>{callSession.status === "incoming" ? "Incoming video call" : "Waiting for video…"}</span>
@@ -1392,8 +1896,15 @@ function ChatHome() {
               <div className="call-audio-stage">
                 <Avatar className="call-avatar">{callSession.peerName.charAt(0).toUpperCase()}</Avatar>
                 <strong>{callSession.peerName}</strong>
+                {(callSession.participants?.length || 0) > 2 && (
+                  <div className="call-audio-participants">
+                    {callSession.participants.map((userId) => <span key={userId}>{String(userId) === currentUserId ? "You" : getCallName(userId)}</span>)}
+                  </div>
+                )}
                 <span>{callSession.status === "incoming" ? "is calling you" : callSession.status === "connected" ? "Voice call in progress" : "Ringing…"}</span>
-                <audio ref={remoteAudioRef} autoPlay />
+                {Object.entries(remoteStreams).map(([userId, stream]) => (
+                  <audio key={userId} ref={(element) => { if (element && element.srcObject !== stream) element.srcObject = stream; }} autoPlay />
+                ))}
               </div>
             )}
             <footer className="call-dialog-actions">
@@ -1435,7 +1946,7 @@ function ChatHome() {
               <div>
                 <p className="chat-overline">CONNECT</p>
                 <h2 id="contact-picker-title">Start a new chat</h2>
-                <p>Choose someone from your Connect community.</p>
+                <p>Find someone using their mobile number, then send a request.</p>
               </div>
               <IconButton
                 className="contact-picker-close"
@@ -1449,44 +1960,94 @@ function ChatHome() {
               className="contact-picker-search-label"
               htmlFor="contact-picker-search"
             >
-              Find a person
+              Mobile number
             </label>
             <input
               id="contact-picker-search"
               className="contact-picker-search"
               type="search"
-              placeholder="Search by name or email"
+              placeholder="Enter mobile number, including country code"
+              inputMode="tel"
               value={contactQuery}
               onChange={(event) => setContactQuery(event.target.value)}
               autoFocus
             />
             <div className="contact-picker-list">
-              {filteredContacts.length ? (
-                filteredContacts.map((user) => (
-                  <button
-                    className="contact-picker-item"
-                    type="button"
-                    key={user._id}
-                    onClick={() => openChat(user)}
-                  >
-                    <span className="contact-picker-avatar">
-                      {user.name.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="contact-picker-user">
-                      <strong>{user.name}</strong>
-                      <small>{user.email}</small>
-                    </span>
-                    <ArrowForwardRounded className="contact-picker-arrow" />
-                  </button>
-                ))
+              {searchingPeople ? (
+                <p className="contact-picker-empty">Searching by mobile number…</p>
+              ) : searchResult?.user ? (
+                <div className="contact-picker-result">
+                  <span className="contact-picker-avatar">{searchResult.user.name.charAt(0).toUpperCase()}</span>
+                  <span className="contact-picker-user">
+                    <strong>{searchResult.user.name}</strong>
+                    <small>{searchResult.relationship === "friends" ? "Already friends" : "Found by mobile number"}</small>
+                  </span>
+                  {searchResult.relationship === "friends" ? (
+                    <button type="button" onClick={() => openChat(searchResult.user)}>Open chat</button>
+                  ) : searchResult.relationship === "outgoing" ? (
+                    <button type="button" disabled>Request sent</button>
+                  ) : searchResult.relationship === "incoming" ? (
+                    <button type="button" onClick={() => acceptFriendRequest(searchResult.requestId, searchResult.user)}>Accept</button>
+                  ) : (
+                    <button type="button" onClick={() => sendFriendRequest(searchResult.user)}>Add friend</button>
+                  )}
+                </div>
               ) : (
                 <p className="contact-picker-empty">
-                  {users.length
-                    ? "No people match that search."
-                    : "No other accounts are available yet."}
+                  {searchResult?.error || (contactQuery.replace(/\D/g, "").length < 7
+                    ? "Enter at least 7 digits to find someone by mobile number."
+                    : "No account found with that mobile number.")}
                 </p>
               )}
             </div>
+            {friendActionError && <p className="friend-action-error" role="alert">{friendActionError}</p>}
+          </section>
+        </div>
+      )}
+      {requestPanelOpen && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setRequestPanelOpen(false);
+        }}>
+          <section className="contact-picker friend-requests-panel" role="dialog" aria-modal="true" aria-labelledby="friend-requests-title">
+            <header className="contact-picker-header">
+              <div><p className="chat-overline">YOUR PEOPLE</p><h2 id="friend-requests-title">Friend requests</h2><p>Accept a request to start chatting.</p></div>
+              <IconButton className="contact-picker-close" aria-label="Close requests" onClick={() => setRequestPanelOpen(false)}><CloseRounded /></IconButton>
+            </header>
+            {friendActionError && <p className="friend-action-error" role="alert">{friendActionError}</p>}
+            <h3 className="request-section-title">Incoming</h3>
+            {friendRequests.incoming.length ? friendRequests.incoming.map((request) => (
+              <div className="friend-request-row" key={request._id}>
+                <span className="contact-picker-avatar">{request.sender?.name?.charAt(0).toUpperCase() || "?"}</span>
+                <span className="contact-picker-user"><strong>{request.sender?.name || "Connect user"}</strong><small>Wants to connect with you</small></span>
+                <button type="button" onClick={() => acceptFriendRequest(request._id, request.sender)}>Accept</button>
+                <button type="button" className="request-decline" onClick={() => rejectFriendRequest(request._id)}>Decline</button>
+              </div>
+            )) : <p className="contact-picker-empty">No incoming requests.</p>}
+            <h3 className="request-section-title">Sent</h3>
+            {friendRequests.outgoing.length ? friendRequests.outgoing.map((request) => (
+              <div className="friend-request-row" key={request._id}>
+                <span className="contact-picker-avatar">{request.recipient?.name?.charAt(0).toUpperCase() || "?"}</span>
+                <span className="contact-picker-user"><strong>{request.recipient?.name || "Connect user"}</strong><small>Waiting for their response</small></span>
+                <span className="request-pending-label">Pending</span>
+              </div>
+            )) : <p className="contact-picker-empty">No sent requests.</p>}
+          </section>
+        </div>
+      )}
+      {phoneDialogOpen && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setPhoneDialogOpen(false);
+        }}>
+          <section className="contact-picker phone-setup-panel" role="dialog" aria-modal="true" aria-labelledby="phone-setup-title">
+            <header className="contact-picker-header">
+              <div><p className="chat-overline">ACCOUNT</p><h2 id="phone-setup-title">Mobile number</h2><p>Friends can find you using this number.</p></div>
+              <IconButton className="contact-picker-close" aria-label="Close mobile number settings" onClick={() => setPhoneDialogOpen(false)}><CloseRounded /></IconButton>
+            </header>
+            <form onSubmit={savePhoneNumber}>
+              <input className="contact-picker-search" type="tel" inputMode="tel" autoComplete="tel" placeholder="Include your country code" value={phoneDraft} onChange={(event) => setPhoneDraft(event.target.value)} required />
+              {phoneError && <p className="friend-action-error" role="alert">{phoneError}</p>}
+              <button className="phone-save-button" type="submit">Save mobile number</button>
+            </form>
           </section>
         </div>
       )}

@@ -9,11 +9,13 @@ const connectDb = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const messageRoutes = require("./routes/messageRoutes");
+const friendRoutes = require("./routes/friendRoutes");
 const onlineUsers = require("./socket/socketManager");
 const Message = require("./models/message");
 const User = require("./models/User");
 const registerCallSignaling = require("./socket/callSignaling");
 const dns = require("dns");
+const uploadDirectory = require("./config/uploadDirectory");
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
@@ -45,13 +47,14 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static(uploadDirectory));
 
 connectDb();
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/friends", friendRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend is Running");
@@ -95,9 +98,34 @@ io.on("connection", (socket) => {
         isOnline: true,
       });
 
+      io.emit("presenceUpdate", {
+        userId: authenticatedUserId,
+        isOnline: true,
+      });
+
       console.log("User is online");
     } catch (error) {
       console.log("Online status error:", error.message);
+    }
+  });
+
+  socket.on("typing:update", async ({ toUserId, text, sequence = 0 } = {}) => {
+    try {
+      const recipientId = String(toUserId || "");
+      if (!socket.userId || !recipientId || recipientId === socket.userId) return;
+      const eventSequence = Number(sequence) || 0;
+      socket.typingSequence = Math.max(socket.typingSequence || 0, eventSequence);
+      const areFriends = await User.exists({ _id: socket.userId, friends: recipientId });
+      const recipientSocket = onlineUsers.get(recipientId);
+      if (areFriends && recipientSocket && eventSequence === socket.typingSequence) {
+        io.to(recipientSocket).emit("typing:update", {
+          fromUserId: socket.userId,
+          text: String(text || "").slice(0, 1000),
+          sequence: eventSequence,
+        });
+      }
+    } catch (error) {
+      console.log("Typing event error:", error.message);
     }
   });
   socket.on("messageDelivered", async (data) => {
@@ -164,12 +192,20 @@ io.on("connection", (socket) => {
     try {
       console.log("User disconnected:", socket.id);
 
-      if (socket.userId) {
+      // A user may have another tab or a newer reconnect. Only the socket
+      // currently recorded for that user is allowed to mark them offline.
+      if (socket.userId && onlineUsers.get(socket.userId) === socket.id) {
         onlineUsers.delete(socket.userId);
 
         await User.findByIdAndUpdate(socket.userId, {
           isOnline: false,
           lastSeen: new Date(),
+        });
+
+        io.emit("presenceUpdate", {
+          userId: socket.userId,
+          isOnline: false,
+          lastSeen: new Date().toISOString(),
         });
 
         console.log("User is offline");

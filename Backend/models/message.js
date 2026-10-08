@@ -16,6 +16,18 @@ const messageSchema=new mongoose.Schema({
     required:true,
     trim:true
   },
+  kind: { type: String, enum: ["text", "call"], default: "text" },
+  call: {
+    type: { type: String, enum: ["audio", "video"] },
+    status: { type: String, enum: ["completed", "missed", "declined", "unanswered"] },
+    durationSeconds: { type: Number, default: 0 },
+  },
+  attachment: {
+    url: { type: String },
+    name: { type: String },
+    mimeType: { type: String },
+    size: { type: Number },
+  },
   status:{
     type:String,
     enum:["sent","delivered","read"],

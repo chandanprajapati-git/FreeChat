@@ -1,22 +1,31 @@
 const Message = require("../models/message");
+const User = require("../models/User");
 
 const sendMessage = async (req, res) => {
   try {
     console.log("SEND MESSAGE CONTROLLER HIT");
     const { receiverId, message, replyTo } = req.body;
 
-    if (!receiverId || !message) {
+    if (!receiverId || (!message?.trim() && !req.file)) {
       return res.status(400).json({
         message: "Receiver and message are required",
       });
     }
+    const areFriends = await User.exists({ _id: req.user, friends: receiverId });
+    if (!areFriends) return res.status(403).json({ message: "Accept a friend request before messaging." });
 
     const newMessage = await Message.create({
   sender: req.user,
   receiver: receiverId,
-  message: message,
-  replyTo: replyTo || null
-});
+      message: message?.trim() || req.file.originalname,
+      replyTo: replyTo || null,
+      attachment: req.file ? {
+        url: `/uploads/${req.file.filename}`,
+        name: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      } : undefined,
+    });
 const populatedMessage = await newMessage.populate(
   "replyTo",
   "message sender"
@@ -47,6 +56,8 @@ const populatedMessage = await newMessage.populate(
 const getMessages = async (req, res) => {
   try {
     const { userId } = req.params;
+    const areFriends = await User.exists({ _id: req.user, friends: userId });
+    if (!areFriends) return res.status(403).json({ message: "Chat is available only between friends." });
 
     const messages = await Message.find({
   $or: [
@@ -72,6 +83,11 @@ const editMessage = async (req, res) => {
       return res.status(400).json({
         message: "Message is required",
       });
+    }
+
+    const existingMessage = await Message.findOne({ _id: messageId, sender: req.user }).select("receiver");
+    if (existingMessage && !(await User.exists({ _id: req.user, friends: existingMessage.receiver }))) {
+      return res.status(403).json({ message: "You must be friends to edit this message." });
     }
 
     const updatedMessage = await Message.findOneAndUpdate(
@@ -132,6 +148,10 @@ const deleteMessage = async (req, res) => {
       return res.status(404).json({
         message: "Message not found or not authorized",
       });
+    }
+
+    if (!(await User.exists({ _id: req.user, friends: message.receiver }))) {
+      return res.status(403).json({ message: "You must be friends to delete this message." });
     }
 
     await Message.findByIdAndDelete(messageId);
