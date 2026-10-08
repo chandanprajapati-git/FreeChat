@@ -842,12 +842,12 @@
 .chat-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-start !important;
   gap: 14px;
   min-width: 0;
   padding: 14px 22px;
 }
-.chat-header-person { min-width: 0; margin: 0; }
+.chat-header-person { min-width: 0; margin: 0 auto 0 0 !important; }
 .chat-header-person > div:last-child { min-width: 0; }
 .chat-header-person h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-messages { min-width: 0; padding: 20px 24px; }
