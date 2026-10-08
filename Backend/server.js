@@ -20,7 +20,30 @@ dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Render and Vercel use different origins. Keep localhost for development,
+// allow Vercel deployments, and let production deployments list their exact
+// frontend origins in FRONTEND_ORIGINS (comma-separated).
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    let hostname = "";
+    try {
+      hostname = new URL(origin).hostname;
+    } catch {
+      return callback(new Error("Invalid request origin"));
+    }
+    const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+    const isVercel = hostname === "vercel.app" || hostname.endsWith(".vercel.app");
+    callback(null, isLocal || isVercel || allowedOrigins.includes(origin));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
@@ -37,10 +60,7 @@ app.get("/", (req, res) => {
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"],
-  },
+  cors: corsOptions,
 });
 
 io.use((socket, next) => {
