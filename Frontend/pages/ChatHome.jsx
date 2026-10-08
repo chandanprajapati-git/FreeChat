@@ -91,7 +91,7 @@ function ChatHome() {
       return imagePath;
     }
 
-    return `http://localhost:5001${imagePath}`;
+    return `https://freechat-ydqe.onrender.com${imagePath}`;
   };
 
   const messagesEndRef = useRef(null);
@@ -157,7 +157,7 @@ function ChatHome() {
       const results = await Promise.allSettled(
         users.map(async (user) => {
           const response = await fetch(
-            `http://localhost:5001/api/messages/${user._id}`,
+            `https://freechat-ydqe.onrender.com/api/messages/${user._id}`,
             {
               headers: { Authorization: `Bearer ${token}` },
             },
@@ -196,7 +196,7 @@ function ChatHome() {
     const fetchUsers = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch("http://localhost:5001/api/users", {
+        const response = await fetch("https://freechat-ydqe.onrender.com/api/users", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -235,7 +235,7 @@ function ChatHome() {
         const token = localStorage.getItem("token");
 
         const response = await fetch(
-          "http://localhost:5001/api/users/profile",
+          "https://freechat-ydqe.onrender.com/api/users/profile",
           {
             method: "GET",
             headers: {
@@ -268,7 +268,7 @@ function ChatHome() {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `http://localhost:5001/api/messages/${selectedUserId}`,
+          `https://freechat-ydqe.onrender.com/api/messages/${selectedUserId}`,
           {
             method: "GET",
             headers: {
@@ -317,7 +317,7 @@ function ChatHome() {
       formData.append("profileImage", fileToUpload);
 
       const response = await fetch(
-        "http://localhost:5001/api/users/profile-image",
+        "https://freechat-ydqe.onrender.com/api/users/profile-image",
         {
           method: "PUT",
           headers: {
@@ -349,7 +349,7 @@ function ChatHome() {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        `http://localhost:5001/api/messages/${messageId}`,
+        `https://freechat-ydqe.onrender.com/api/messages/${messageId}`,
         {
           method: "DELETE",
           headers: {
@@ -381,7 +381,7 @@ function ChatHome() {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        `http://localhost:5001/api/messages/${messageId}`,
+        `https://freechat-ydqe.onrender.com/api/messages/${messageId}`,
         {
           method: "PUT",
           headers: {
@@ -421,7 +421,7 @@ function ChatHome() {
     }
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:5001/api/messages", {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -695,7 +695,7 @@ function ChatHome() {
     if (!token) return;
 
     const decoded = jwtDecode(token);
-    const newSocket = io("http://localhost:5001", {
+    const newSocket = io("https://freechat-ydqe.onrender.com", {
       auth: { token },
     });
     setsocket(newSocket);
