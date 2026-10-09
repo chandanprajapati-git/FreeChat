@@ -6,12 +6,12 @@ const getUsers= async (req,res)=>{
     const users = currentUser?.friends?.length
       ? await User.find(
         { _id: { $in: currentUser.friends } },
-        "name email profileImage isAnonymous isOnline lastSeen",
+        "name email profileImage status isAnonymous isOnline lastSeen",
       )
       : [];
     res.status(200).json(users.map((user) => {
       if (!user.isAnonymous) return user;
-      return { ...user.toObject(), name: "Anonymous", email: "", profileImage: "", isOnline: false, lastSeen: null };
+      return { ...user.toObject(), name: "Anonymous", email: "", profileImage: "", status: "", isOnline: false, lastSeen: null };
     }));
   } 
   catch(error){
@@ -26,7 +26,7 @@ const getMyProfile = async (req, res) => {
   try {
     const user = await User.findById(
       req.user,
-      "name email phone profileImage isAnonymous isOnline lastSeen"
+      "name email phone profileImage status isAnonymous isOnline lastSeen"
     );
 
     if (!user) {
@@ -45,6 +45,27 @@ const getMyProfile = async (req, res) => {
   }
 };
 
+const updateMyStatus = async (req, res) => {
+  const status = String(req.body.status || "").trim();
+  if (status.length > 160) return res.status(400).json({ message: "Status must be 160 characters or fewer." });
+  try {
+    const user = await User.findByIdAndUpdate(req.user, { status }, { new: true })
+      .select("status isAnonymous friends");
+    if (!user) return res.status(404).json({ message: "User not found." });
+    if (!user.isAnonymous) {
+      const io = req.app.get("io");
+      const onlineUsers = require("../socket/socketManager");
+      for (const friendId of user.friends) {
+        const socketId = onlineUsers.get(String(friendId));
+        if (socketId) io.to(socketId).emit("profileStatusChanged", { userId: String(user._id), status: user.status || "" });
+      }
+    }
+    res.json({ message: "Status updated.", status: user.status || "" });
+  } catch {
+    res.status(500).json({ message: "Could not update your status." });
+  }
+};
+
 const updatePrivacy = async (req, res) => {
   if (typeof req.body.isAnonymous !== "boolean") {
     return res.status(400).json({ message: "Choose whether your profile is visible." });
@@ -54,7 +75,7 @@ const updatePrivacy = async (req, res) => {
       req.user,
       { isAnonymous: req.body.isAnonymous },
       { new: true },
-    ).select("name email phone profileImage isAnonymous isOnline lastSeen friends");
+    ).select("name email phone profileImage status isAnonymous isOnline lastSeen friends");
     if (!user) return res.status(404).json({ message: "User not found." });
 
     const hidden = user.isAnonymous;
@@ -64,6 +85,7 @@ const updatePrivacy = async (req, res) => {
       name: hidden ? "Anonymous" : user.name,
       email: hidden ? "" : user.email,
       profileImage: hidden ? "" : user.profileImage,
+      status: hidden ? "" : user.status || "",
       isOnline: hidden ? false : user.isOnline,
       lastSeen: hidden ? null : user.lastSeen,
     };
@@ -132,4 +154,4 @@ const uploadProfileImage = async (req, res) => {
     });
   }
 };
-module.exports={getUsers,getMyProfile,uploadProfileImage,updateMyPhone,updatePrivacy}
+module.exports={getUsers,getMyProfile,uploadProfileImage,updateMyPhone,updatePrivacy,updateMyStatus}

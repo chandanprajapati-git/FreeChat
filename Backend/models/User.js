@@ -24,6 +24,7 @@ const userSchema=new mongoose.Schema({
       type:String,
       default:""
     },
+  status:{ type:String, trim:true, maxlength:160, default:"" },
   isAnonymous:{
     type:Boolean,
     default:false
