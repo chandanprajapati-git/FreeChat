@@ -2,10 +2,12 @@ const Message = require("../models/message");
 const User = require("../models/User");
 const Group = require("../models/Group");
 
-const maskGroupAuthors = (messages) => messages.map((message) => {
+const maskGroupAuthors = (messages, requesterId, friendIds) => messages.map((message) => {
   const item = message.toObject ? message.toObject() : { ...message };
-  if (item.sender?.isAnonymous) {
-    item.sender = { ...item.sender, name: "Anonymous", profileImage: "", email: "" };
+  const senderId = String(item.sender?._id || item.sender);
+  const canSeeProfile = senderId === String(requesterId) || friendIds.some((id) => String(id) === senderId);
+  if (item.sender?.isAnonymous || !canSeeProfile) {
+    item.sender = { ...item.sender, name: "Anonymous", profileImage: "", email: "", isOnline: false };
   }
   return item;
 });
@@ -43,7 +45,7 @@ const sendMessage = async (req, res) => {
     });
 const populatedMessage = await newMessage.populate([
   { path: "replyTo", select: "message sender" },
-  ...(groupId ? [{ path: "sender", select: "name profileImage isAnonymous" }] : []),
+  ...(groupId ? [{ path: "sender", select: "name profileImage isAnonymous isOnline" }] : []),
 ]);
 
     const io = req.app.get("io");
@@ -55,10 +57,19 @@ const populatedMessage = await newMessage.populate([
     console.log("Online Users:", onlineUsers);
     if (groupId) {
       const groupPayload = populatedMessage.toObject();
-      if (groupPayload.sender?.isAnonymous) {
-        groupPayload.sender = { ...groupPayload.sender, name: "Anonymous", profileImage: "", email: "" };
+      const authorId = String(groupPayload.sender?._id || req.user);
+      for (const memberId of group.members) {
+        const memberKey = String(memberId);
+        const memberSocket = onlineUsers.get(memberKey);
+        if (!memberSocket) continue;
+        const canSeeAuthor = memberKey === authorId || !groupPayload.sender?.isAnonymous
+          && await User.exists({ _id: memberId, friends: authorId });
+        const personalizedPayload = { ...groupPayload };
+        if (!canSeeAuthor) {
+          personalizedPayload.sender = { ...groupPayload.sender, name: "Anonymous", profileImage: "", email: "", isOnline: false };
+        }
+        io.to(memberSocket).emit("groupMessage", personalizedPayload);
       }
-      io.to(`group:${groupId}`).emit("groupMessage", groupPayload);
     } else if (receiverSocketId) {
       io.to(receiverSocketId).emit("receiveMessage", populatedMessage);
     }
@@ -98,13 +109,18 @@ const getMessages = async (req, res) => {
 const getGroupMessages = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const isMember = await Group.exists({ _id: groupId, members: req.user });
-    if (!isMember) return res.status(403).json({ message: "Join this group to view its messages." });
-    const messages = await Message.find({ group: groupId })
-      .populate("sender", "name profileImage email isAnonymous")
+    const [group, self] = await Promise.all([
+      Group.findOne({ _id: groupId, members: req.user }).select("clearedAtByUser"),
+      User.findById(req.user).select("friends"),
+    ]);
+    if (!group) return res.status(403).json({ message: "Join this group to view its messages." });
+    const clearDate = group.clearedAtByUser?.get(String(req.user));
+    const query = { group: groupId, ...(clearDate ? { createdAt: { $gt: clearDate } } : {}) };
+    const messages = await Message.find(query)
+      .populate("sender", "name profileImage email isAnonymous isOnline")
       .populate("replyTo", "message sender")
       .sort({ createdAt: 1 });
-    res.json(maskGroupAuthors(messages));
+    res.json(maskGroupAuthors(messages, req.user, self?.friends || []));
   } catch (error) {
     res.status(500).json({ message: "Could not load group messages.", error: error.message });
   }

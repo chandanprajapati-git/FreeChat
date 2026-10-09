@@ -1155,6 +1155,46 @@
 .group-create-dialog .phone-save-button { margin-top: 4px; }
 .group-qr-button { flex: 0 0 auto; margin-left: 8px; }
 .group-message-author { display: block; margin: 0 0 4px; color: #a8d7ff; font-size: 10px; font-weight: 750; }
+.group-message-author { padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.group-menu-wrap { position: relative; flex: 0 0 auto; }
+.group-header-menu { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; display: grid; width: 210px; padding: 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 13px; background: rgba(19,22,29,.94); box-shadow: 0 16px 44px rgba(0,0,0,.34); backdrop-filter: blur(20px); }
+.group-header-menu button { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border: 0; border-radius: 8px; color: rgba(255,255,255,.88); background: transparent; text-align: left; font-size: 12px; cursor: pointer; }
+.group-header-menu button:hover { background: rgba(255,255,255,.1); }
+.group-header-menu button svg { width: 18px; height: 18px; color: #c4a3e3; }
+.group-header-menu .group-menu-danger { color: #ffb6b6; }
+.group-header-menu .group-menu-danger svg { color: #ffaaaa; }
+.group-add-tabs { display: flex; gap: 6px; margin-bottom: 13px; padding: 4px; border: 1px solid rgba(255,255,255,.13); border-radius: 11px; background: rgba(255,255,255,.05); }
+.group-add-tabs button { flex: 1; min-height: 35px; border: 0; border-radius: 8px; color: rgba(255,255,255,.68); background: transparent; font-size: 11px; cursor: pointer; }
+.group-add-tabs button.active { color: #fff; background: rgba(139,208,255,.2); }
+.group-add-friend-list,.group-member-list { display: grid; gap: 7px; max-height: 370px; overflow-y: auto; }
+.group-add-friend-row,.group-member-row { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; }
+.group-add-friend-row .contact-picker-user,.group-member-person { flex: 1; min-width: 0; }
+.group-add-friend-row > .MuiIconButton-root,.friend-request-row > .MuiIconButton-root,.contact-picker-result > .MuiIconButton-root { color: #d4b5ee; }
+.group-add-friend-row > .MuiIconButton-root:disabled { opacity: .45; }
+.group-member-avatar { width: 36px !important; height: 36px !important; color: white; background: linear-gradient(145deg,#7b5793,#405475); }
+.group-member-person { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; color: rgba(255,255,255,.92); background: transparent; text-align: left; cursor: pointer; }
+.group-member-person strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.group-online-dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border: 2px solid #1b1d24; border-radius: 50%; background: #39c879; }
+.group-admin-badge { flex: 0 0 auto; padding: 4px 7px; border: 1px solid rgba(193,154,233,.3); border-radius: 999px; color: #d9b7fa; background: rgba(151,105,190,.16); font-size: 9px; font-weight: 750; }
+.group-remove-button { width: 30px; height: 30px; color: #ffb3b3 !important; }
+.group-member-list-full { max-height: min(55dvh, 520px); }
+.group-details-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.group-details-heading h3 { margin-bottom: 3px; }
+.group-details-heading small { color: rgba(255,255,255,.56); font-size: 10px; }
+.group-details-heading > button { padding: 6px 8px; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; color: #d5b6ef; background: rgba(255,255,255,.06); font-size: 10px; cursor: pointer; }
+.group-profile-add-button { width: 44px; height: 44px; margin-top: 14px; color: white !important; background: #6b4389 !important; }
+.group-member-profile-main { display: flex; flex-direction: column; align-items: center; padding: 8px 0 18px; }
+.group-member-profile-avatar { width: 86px !important; height: 86px !important; color: white; background: linear-gradient(145deg,#7b5793,#405475); }
+.group-member-profile-main > strong { margin-top: 12px; color: rgba(255,255,255,.94); font-size: 15px; }
+.group-member-profile-main > small { margin-top: 4px; color: rgba(255,255,255,.58); font-size: 11px; }
+.group-phone-search > div { display: flex; align-items: flex-start; gap: 7px; }
+.group-phone-search .contact-picker-search { flex: 1; min-width: 0; }
+.group-phone-search .MuiIconButton-root { flex: 0 0 auto; color: #d6b8ef; }
+.group-people-dialog,.group-details-dialog,.group-member-profile-dialog { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.group-member-row .relative,.group-add-friend-row .relative,.group-member-person .relative,.group-member-profile-main .relative { position: relative; flex: 0 0 auto; }
+.group-message-author:hover { text-decoration: underline; }
+.group-member-count { margin: 4px 0 0; color: rgba(255,255,255,.58); font-size: 10px; }
+.group-header-menu ~ * { pointer-events: auto; }
 .phone-setup-panel { gap: 0; }
 .phone-setup-panel .contact-picker-header { margin-bottom: 14px; }
 .phone-setup-panel form { margin-top: 2px; }

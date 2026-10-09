@@ -9,6 +9,9 @@ import Tooltip from "@mui/material/Tooltip";
 import ForumRounded from "@mui/icons-material/ForumRounded";
 import GroupAddRounded from "@mui/icons-material/GroupAddRounded";
 import GroupRounded from "@mui/icons-material/GroupRounded";
+import MoreVertRounded from "@mui/icons-material/MoreVertRounded";
+import PersonAddAlt1Rounded from "@mui/icons-material/PersonAddAlt1Rounded";
+import CheckRounded from "@mui/icons-material/CheckRounded";
 import LogoutRounded from "@mui/icons-material/LogoutRounded";
 import EditRounded from "@mui/icons-material/EditRounded";
 import AddCircleOutlineRounded from "@mui/icons-material/AddCircleOutlineRounded";
@@ -87,6 +90,7 @@ function ChatHome() {
 
   const [users, setusers] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [recentMessages, setRecentMessages] = useState({});
   const [profileName, setProfileName] = useState(
     () => localStorage.getItem("profileName") || "My account",
   );
@@ -106,6 +110,16 @@ function ChatHome() {
   const [groupActionError, setGroupActionError] = useState("");
   const [groupQrTarget, setGroupQrTarget] = useState(null);
   const [groupQrImage, setGroupQrImage] = useState("");
+  const [groupDetails, setGroupDetails] = useState(null);
+  const [groupDetailsOpen, setGroupDetailsOpen] = useState(false);
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false);
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  const [addPeopleTab, setAddPeopleTab] = useState("friends");
+  const [groupPhoneQuery, setGroupPhoneQuery] = useState("");
+  const [groupPhoneResult, setGroupPhoneResult] = useState(null);
+  const [groupPhoneError, setGroupPhoneError] = useState("");
+  const [groupQrScanStatus, setGroupQrScanStatus] = useState("");
+  const [groupMemberProfile, setGroupMemberProfile] = useState(null);
   const [qrScanStatus, setQrScanStatus] = useState("");
   const [qrRequestSending, setQrRequestSending] = useState(false);
   const [requestPanelOpen, setRequestPanelOpen] = useState(false);
@@ -195,6 +209,18 @@ function ChatHome() {
       .toLowerCase()
       .includes(messageSearch.trim().toLowerCase()),
   );
+  const selectedGroupMemberId = String(groupMemberProfile?._id || "");
+  const selectedGroupMemberIsFriend = users.some((user) => String(user._id) === selectedGroupMemberId);
+  const incomingGroupFriendRequest = friendRequests.incoming.find((request) => String(request.sender?._id || request.sender) === selectedGroupMemberId);
+  const outgoingGroupFriendRequest = friendRequests.outgoing.find((request) => String(request.recipient?._id || request.recipient) === selectedGroupMemberId);
+  const messagePreview = (message) => {
+    if (!message) return "No messages yet";
+    const senderId = String(message.sender?._id || message.sender);
+    const content = message.attachment
+      ? message.attachment.mimeType?.startsWith("image/") ? "Photo" : message.attachment.mimeType?.startsWith("audio/") ? "Audio" : message.attachment.name || "File"
+      : message.message || "Message";
+    return `${senderId === String(currentUserId) ? "You: " : ""}${content}`;
+  };
   const cropFrameSize = 240;
   const cropPreviewScale = profileImageDimensions
     ? Math.max(cropFrameSize / profileImageDimensions.width, cropFrameSize / profileImageDimensions.height) * profileZoom
@@ -245,6 +271,95 @@ function ChatHome() {
     } catch {
       // Retry on the next refresh.
     }
+  };
+
+  const refreshGroupDetails = async (groupId = selecteduser?._id) => {
+    if (!groupId) return;
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/groups/${groupId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (response.ok && String(selectedUserIdRef.current) === String(groupId)) setGroupDetails(data);
+    } catch {
+      // Keep the last roster visible if the connection briefly drops.
+    }
+  };
+
+  const addGroupPerson = async (userId) => {
+    if (!selecteduser?.isGroup) return false;
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/groups/${selecteduser._id}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not add that person.");
+      setGroupPhoneError("");
+      await Promise.all([refreshGroupDetails(selecteduser._id), refreshGroups()]);
+      return true;
+    } catch (error) {
+      setGroupPhoneError(error.message);
+      return false;
+    }
+  };
+
+  const searchGroupPerson = async (event) => {
+    event.preventDefault();
+    setGroupPhoneError("");
+    setGroupPhoneResult(null);
+    try {
+      const phone = groupPhoneQuery.replace(/\D/g, "");
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/friends/search?phone=${encodeURIComponent(phone)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "No account found with that number.");
+      setGroupPhoneResult(data);
+    } catch (error) {
+      setGroupPhoneError(error.message);
+    }
+  };
+
+  const removeGroupMember = async (member) => {
+    if (!selecteduser?.isGroup || !window.confirm(`Remove ${member.name} from this group?`)) return;
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/groups/${selecteduser._id}/members/${member._id}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not remove member.");
+      await refreshGroupDetails(selecteduser._id);
+      await refreshGroups();
+    } catch (error) {
+      setGroupActionError(error.message);
+    }
+  };
+
+  const leaveGroup = async () => {
+    if (!selecteduser?.isGroup || !window.confirm(`Leave ${selecteduser.name}?`)) return;
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/groups/${selecteduser._id}/leave`, {
+        method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not leave group.");
+      setselecteduser(null); setmessages([]); setGroupDetails(null); setGroupMenuOpen(false);
+      await refreshGroups();
+    } catch (error) { setGroupActionError(error.message); }
+  };
+
+  const clearGroupChat = async () => {
+    if (!selecteduser?.isGroup || !window.confirm(`Clear your message history for ${selecteduser.name}? Other members will keep their chat history.`)) return;
+    try {
+      const response = await fetch(`https://freechat-ydqe.onrender.com/api/groups/${selecteduser._id}/messages`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not clear group chat.");
+      setmessages([]); setGroupMenuOpen(false); setRecentMessages((current) => ({ ...current, [selecteduser._id]: "" }));
+    } catch (error) { setGroupActionError(error.message); }
   };
 
   const createGroup = async (event) => {
@@ -441,6 +556,53 @@ function ChatHome() {
     return () => { active = false; };
   }, [groupQrTarget]);
 
+  useEffect(() => {
+    if (!selecteduser?.isGroup) { setGroupDetails(null); return undefined; }
+    void refreshGroupDetails(selecteduser._id);
+    const interval = window.setInterval(() => refreshGroupDetails(selecteduser._id), 12000);
+    return () => window.clearInterval(interval);
+  }, [selectedUserId, selecteduser?.isGroup]);
+
+  useEffect(() => {
+    if (!addPeopleOpen || addPeopleTab !== "qr") return undefined;
+    let cancelled = false;
+    let scanner;
+    const startScanner = async () => {
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (cancelled) return;
+        scanner = new Html5Qrcode("group-add-qr-reader");
+        await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1 }, async (decodedText) => {
+          if (cancelled) return;
+          const match = String(decodedText || "").trim().match(/^connectchat:([a-f\d]{24})$/i);
+          if (!match) { setGroupQrScanStatus("Scan a person’s QR code to add them or send a friend request."); return; }
+          await scanner?.stop().catch(() => {});
+          if (users.some((user) => String(user._id) === match[1])) {
+            const added = await addGroupPerson(match[1]);
+            setGroupQrScanStatus(added ? "Friend added to the group." : "Could not add this friend.");
+            if (added) await refreshGroupDetails(selecteduser?._id);
+          } else {
+            try {
+              const response = await fetch("https://freechat-ydqe.onrender.com/api/friends/requests", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+                body: JSON.stringify({ userId: match[1] }),
+              });
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.message || "Could not send friend request.");
+              setGroupQrScanStatus("Friend request sent. Add them to the group after they accept.");
+              await refreshFriendRequests();
+            } catch (error) { setGroupQrScanStatus(error.message); }
+          }
+        }, () => {});
+      } catch {
+        if (!cancelled) setGroupQrScanStatus("Camera access is unavailable. Allow camera permission and try again.");
+      }
+    };
+    void startScanner();
+    return () => { cancelled = true; if (scanner?.isScanning) void scanner.stop().then(() => scanner.clear()).catch(() => {}); };
+  }, [addPeopleOpen, addPeopleTab]);
+
   const acceptFriendRequest = async (requestId, friend) => {
     setFriendActionError("");
     try {
@@ -458,8 +620,10 @@ function ChatHome() {
       await refreshFriendContacts();
       await refreshFriendRequests();
       if (friend) setusers((current) => current.some((item) => String(item._id) === String(friend._id)) ? current : [...current, friend]);
+      return true;
     } catch (error) {
       setFriendActionError(error.message);
+      return false;
     }
   };
 
@@ -555,14 +719,39 @@ function ChatHome() {
       }
       refreshFriendContacts();
     };
+    const onGroupAdded = () => refreshGroups();
+    const onGroupRemoved = ({ groupId }) => {
+      setGroups((current) => current.filter((group) => String(group._id) !== String(groupId)));
+      if (String(selectedUserIdRef.current) === String(groupId)) {
+        setselecteduser(null);
+        setmessages([]);
+        setGroupDetails(null);
+      }
+    };
+    const onGroupCleared = ({ groupId }) => {
+      if (String(selectedUserIdRef.current) === String(groupId)) setmessages([]);
+      setRecentMessages((current) => ({ ...current, [groupId]: "" }));
+    };
+    const onGroupMemberChange = ({ groupId }) => {
+      if (String(selectedUserIdRef.current) === String(groupId)) void refreshGroupDetails(groupId);
+      void refreshGroups();
+    };
     socket?.on("friendRequestReceived", onFriendRequestChange);
     socket?.on("friendRequestUpdated", onFriendRequestChange);
     socket?.on("friendshipRemoved", onFriendshipRemoved);
+    socket?.on("groupAdded", onGroupAdded);
+    socket?.on("groupRemoved", onGroupRemoved);
+    socket?.on("groupCleared", onGroupCleared);
+    socket?.on("groupMemberLeft", onGroupMemberChange);
     return () => {
       window.clearInterval(refreshInterval);
       socket?.off("friendRequestReceived", onFriendRequestChange);
       socket?.off("friendRequestUpdated", onFriendRequestChange);
       socket?.off("friendshipRemoved", onFriendshipRemoved);
+      socket?.off("groupAdded", onGroupAdded);
+      socket?.off("groupRemoved", onGroupRemoved);
+      socket?.off("groupCleared", onGroupCleared);
+      socket?.off("groupMemberLeft", onGroupMemberChange);
     };
   }, [socket]);
 
@@ -586,10 +775,12 @@ function ChatHome() {
               String(message.sender?._id || message.sender) ===
                 String(user._id) && message.status !== "read",
           ).length;
-          return [user._id, count];
+          return [user._id, count, history.length ? messagePreview(history[history.length - 1]) : "No messages yet"];
         }),
       );
       if (!isActive) return;
+      const previews = {};
+      results.forEach((result) => { if (result.status === "fulfilled") previews[result.value[0]] = result.value[2]; });
       setUnreadCounts((current) => {
         const next = { ...current };
         results.forEach((result) => {
@@ -601,12 +792,36 @@ function ChatHome() {
         });
         return next;
       });
+      setRecentMessages((current) => ({ ...current, ...previews }));
     };
     loadUnreadCounts();
     return () => {
       isActive = false;
     };
   }, [userIdsKey]);
+
+  useEffect(() => {
+    if (!groups.length) return undefined;
+    let active = true;
+    const loadGroupPreviews = async () => {
+      const results = await Promise.allSettled(groups.map(async (group) => {
+        const response = await fetch(`https://freechat-ydqe.onrender.com/api/messages/group/${group._id}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        if (!response.ok) throw new Error("Could not load group preview");
+        const history = await response.json();
+        return [group._id, history.length ? messagePreview(history[history.length - 1]) : "No messages yet"];
+      }));
+      if (!active) return;
+      setRecentMessages((current) => {
+        const next = { ...current };
+        results.forEach((result) => { if (result.status === "fulfilled") next[result.value[0]] = result.value[1]; });
+        return next;
+      });
+    };
+    void loadGroupPreviews();
+    return () => { active = false; };
+  }, [groups.map((group) => group._id).join(",")]);
 
   useEffect(() => {
     let isActive = true;
@@ -959,6 +1174,7 @@ function ChatHome() {
       }
       smoothScrollNextRef.current = true;
       setmessages((prevMessages) => prevMessages.some((item) => String(item._id) === String(data.data._id)) ? prevMessages : [...prevMessages, data.data]);
+      setRecentMessages((current) => ({ ...current, [selecteduser._id]: messagePreview(data.data) }));
       setnewMessage("");
       if (!selecteduser.isGroup) emitTypingUpdate(selecteduser._id, "");
       setReplyingTo(null);
@@ -1089,8 +1305,8 @@ function ChatHome() {
     return peerConnection;
   };
 
-  const startCall = async (callType) => {
-    if (!selecteduser || !socket?.connected || callSessionRef.current) {
+  const startCall = async (callType, callTarget = selecteduser) => {
+    if (!callTarget || !socket?.connected || callSessionRef.current) {
       setCallNotice("You can start a call when connected to the chat server and no other call is active.");
       return;
     }
@@ -1117,12 +1333,12 @@ function ChatHome() {
       setLocalStream(stream);
       const activeCall = {
         callId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-        peerUserId: String(selecteduser._id),
-        peerName: selecteduser.name,
+        peerUserId: String(callTarget._id),
+        peerName: callTarget.name,
         callType,
         status: "calling",
         isCaller: true,
-        participants: [currentUserId, String(selecteduser._id)],
+        participants: [currentUserId, String(callTarget._id)],
       };
       setActiveCall(activeCall);
       const peerConnection = await createPeerConnection(activeCall, stream);
@@ -1371,9 +1587,11 @@ function ChatHome() {
     if (!socket) return;
     socket.on("receiveMessage", (data) => {
       const senderId = String(data.sender?._id || data.sender);
+      const receiverIdForPreview = String(data.receiver?._id || data.receiver);
+      const chatId = senderId === String(currentUserId) ? receiverIdForPreview : senderId;
+      setRecentMessages((current) => ({ ...current, [chatId]: messagePreview(data) }));
       if (senderId === String(currentUserId)) {
-        const receiverId = String(data.receiver?._id || data.receiver);
-        if (receiverId === String(selectedUserId)) {
+        if (receiverIdForPreview === String(selectedUserId)) {
           smoothScrollNextRef.current = true;
           setmessages((prevMessages) => prevMessages.some((message) => message._id === data._id) ? prevMessages : [...prevMessages, data]);
         }
@@ -1403,6 +1621,7 @@ function ChatHome() {
         if (String(data.sender?._id || data.sender) === String(currentUserId)) return;
         setUnreadCounts((current) => ({ ...current, [groupId]: (current[groupId] || 0) + 1 }));
       }
+      setRecentMessages((current) => ({ ...current, [groupId]: messagePreview(data) }));
     };
     socket.on("groupMessage", onGroupMessage);
 
@@ -1627,7 +1846,7 @@ function ChatHome() {
                 <div key={`group-${group._id}`} onClick={() => openChat({ ...group, isGroup: true })}
                   className={`chat-contact-item flex items-center gap-3 p-2 rounded-lg cursor-pointer ${selecteduser?._id === group._id ? "chat-contact-active" : "chat-contact-hover"}`}>
                   <Avatar className="contact-avatar w-10 h-10 rounded-full flex items-center justify-center font-medium"><GroupRounded /></Avatar>
-                  <div className="flex-1 min-w-0"><h3 className="font-medium text-[15px] truncate">{group.name}</h3><p className="contact-email text-[13px] truncate">Group · {group.members?.length || 1} members</p></div>
+                  <div className="flex-1 min-w-0"><h3 className="font-medium text-[15px] truncate">{group.name}</h3><p className="contact-email text-[13px] truncate">{recentMessages[group._id] || "No messages yet"}</p></div>
                   {unreadCounts[group._id] > 0 && <span className="contact-unread-badge">{unreadCounts[group._id] > 99 ? "99+" : unreadCounts[group._id]}</span>}
                 </div>
               ))}
@@ -1667,9 +1886,7 @@ function ChatHome() {
                         </span>
                       )}
                     </div>
-                    <p className="contact-email text-[13px] truncate">
-                      {user.email}
-                    </p>
+                    <p className="contact-email text-[13px] truncate">{recentMessages[user._id] || "No messages yet"}</p>
                   </div>
                 </div>
               ))}
@@ -1708,17 +1925,22 @@ function ChatHome() {
                       <h2 className="text-[16px] font-medium leading-tight">
                         {selecteduser.name}
                       </h2>
-                      <p
-                        className={`chat-presence ${selecteduser.isOnline ? "online" : ""}`}
-                      >
-                        {selecteduser.isGroup ? `${selecteduser.members?.length || 1} members` : selecteduser.isOnline ? "Online now" : "Offline"}
-                      </p>
+                      {selecteduser.isGroup && <p className="group-member-count">{groupDetails?.memberCount || selecteduser.members?.length || 1} members</p>}
                     </div>
                   </div>
                   {selecteduser.isGroup ? (
-                    <Tooltip title="Show group QR code">
-                      <IconButton className="chat-call-button group-qr-button" aria-label="Show group QR code" onClick={() => setGroupQrTarget(selecteduser)}><QrCodeRounded /></IconButton>
-                    </Tooltip>
+                    <div className="group-menu-wrap">
+                      <Tooltip title="Group options"><IconButton className="chat-call-button" aria-label="Group options" aria-expanded={groupMenuOpen} onClick={() => setGroupMenuOpen((open) => !open)}><MoreVertRounded /></IconButton></Tooltip>
+                      {groupMenuOpen && <div className="group-header-menu" role="menu" aria-label="Group options">
+                        <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); setAddPeopleTab("friends"); setGroupPhoneError(""); setGroupPhoneResult(null); setAddPeopleOpen(true); }}><PersonAddAlt1Rounded />Add people</button>
+                        <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); setGroupQrTarget(selecteduser); }}><QrCodeRounded />Show group QR</button>
+                        <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); const peer = groupDetails?.members?.find((member) => member.isFriend && member._id !== String(currentUserId)); if (peer) startCall("audio", { _id: peer._id, name: peer.name }); else setGroupActionError("Add a friend to this group before starting a call."); }}><CallRounded />Voice call</button>
+                        <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); const peer = groupDetails?.members?.find((member) => member.isFriend && member._id !== String(currentUserId)); if (peer) startCall("video", { _id: peer._id, name: peer.name }); else setGroupActionError("Add a friend to this group before starting a call."); }}><VideocamRounded />Video call</button>
+                        <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); setGroupDetailsOpen(true); void refreshGroupDetails(selecteduser._id); }}><GroupRounded />Group details</button>
+                        <button type="button" role="menuitem" onClick={() => void clearGroupChat()}><CloseRounded />Clear chat</button>
+                        <button type="button" role="menuitem" className="group-menu-danger" onClick={() => void leaveGroup()}><LogoutRounded />Leave group</button>
+                      </div>}
+                    </div>
                   ) : <div className="chat-call-actions" aria-label="Call options">
                     <Tooltip title="Voice call">
                       <IconButton
@@ -1780,8 +2002,8 @@ function ChatHome() {
                           {!isSentByMe && (
                             <div className="w-7 h-7 flex-shrink-0 mr-2 self-end mb-1">
                               {showAvatar && (
-                                <div className="contact-avatar w-full h-full rounded-full flex items-center justify-center text-[10px] font-medium">
-                                  {selecteduser.isGroup ? <GroupRounded /> : <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />}
+                  <div className="contact-avatar w-full h-full rounded-full flex items-center justify-center text-[10px] font-medium">
+                                  {selecteduser.isGroup ? <AvatarPhoto src={getImageUrl(msg.sender?.profileImage)} name={msg.sender?.name} /> : <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />}
                                 </div>
                               )}
                             </div>
@@ -1795,7 +2017,7 @@ function ChatHome() {
                             }`}
                           >
                             {selecteduser.isGroup && !isSentByMe && (
-                              <small className="group-message-author">{msg.sender?.name || "Group member"}</small>
+                              <button type="button" className="group-message-author" onClick={() => setGroupMemberProfile(msg.sender)}>{msg.sender?.name || "Anonymous"}</button>
                             )}
                             {msg.kind === "call" ? (
                               <div className="call-history-message">
@@ -2119,20 +2341,27 @@ function ChatHome() {
                     )}
                   </div>
                   <h2 className="text-lg font-medium">{selecteduser.name}</h2>
-                  <p className="profile-presence">{selecteduser.isGroup ? `${selecteduser.members?.length || 1} members` : selecteduser.isOnline ? "Online now" : "Offline"}</p>
+                  {selecteduser.isGroup && <p className="profile-presence">{groupDetails?.memberCount || selecteduser.members?.length || 1} members</p>}
                 </div>
                 <div className="profile-details">
-                  {selecteduser.isGroup ? <><h3>Group chat</h3><p className="anonymous-profile-note">Share the QR code in the chat header to invite anyone to join.</p></> : <><h3>Contact details</h3>{!selecteduser.isAnonymous && <div className="profile-detail-row">
+                  {selecteduser.isGroup ? <>
+                    <div className="group-details-heading"><div><h3>Group members</h3><small>{groupDetails?.memberCount || selecteduser.members?.length || 1} people · {groupDetails?.onlineCount || 0} online</small></div><button type="button" onClick={() => setGroupDetailsOpen(true)}>View all</button></div>
+                    <div className="group-member-list">
+                      {(groupDetails?.members || []).slice(0, 6).map((member) => <div className="group-member-row" key={member._id}>
+                        <button className="group-member-person" type="button" onClick={() => setGroupMemberProfile(member)}>
+                          <span className="relative"><Avatar className="group-member-avatar"><AvatarPhoto src={getImageUrl(member.profileImage)} name={member.name} /></Avatar>{member.isOnline && <i className="group-online-dot" />}</span>
+                          <strong>{member.name}</strong>
+                        </button>
+                        {member.isAdmin && <span className="group-admin-badge">Admin</span>}
+                        {groupDetails?.isAdmin && !member.isAdmin && <IconButton className="group-remove-button" aria-label={`Remove ${member.name}`} title="Remove from group" onClick={() => void removeGroupMember(member)}><CloseRounded /></IconButton>}
+                      </div>)}
+                    </div>
+                    {groupActionError && <p className="friend-action-error" role="alert">{groupActionError}</p>}
+                  </> : <><h3>Contact details</h3>{!selecteduser.isAnonymous && <div className="profile-detail-row">
                     <span>Email address</span>
                     <strong>{selecteduser.email}</strong>
                   </div>}
                   {selecteduser.isAnonymous && <p className="anonymous-profile-note">This person chose to keep their profile private.</p>}
-                  <div className="profile-detail-row">
-                    <span>Availability</span>
-                    <strong>
-                      {selecteduser.isOnline ? "Available" : "Offline"}
-                    </strong>
-                  </div>
                   <button className="unfriend-button" type="button" onClick={() => unfriend(selecteduser)}>
                     Remove friend
                   </button>
@@ -2329,9 +2558,9 @@ function ChatHome() {
                   ) : searchResult.relationship === "outgoing" ? (
                     <button type="button" disabled>Request sent</button>
                   ) : searchResult.relationship === "incoming" ? (
-                    <button type="button" onClick={() => acceptFriendRequest(searchResult.requestId, searchResult.user)}>Accept</button>
+                    <IconButton title="Accept friend request" aria-label="Accept friend request" onClick={() => acceptFriendRequest(searchResult.requestId, searchResult.user)}><CheckRounded /></IconButton>
                   ) : (
-                    <button type="button" onClick={() => sendFriendRequest(searchResult.user)}>Add friend</button>
+                    <IconButton title="Send friend request" aria-label="Send friend request" onClick={() => sendFriendRequest(searchResult.user)}><PersonAddAlt1Rounded /></IconButton>
                   )}
                 </div>
               ) : (
@@ -2361,8 +2590,8 @@ function ChatHome() {
               <div className="friend-request-row" key={request._id}>
                 <span className="contact-picker-avatar">{request.sender?.name?.charAt(0).toUpperCase() || "?"}</span>
                 <span className="contact-picker-user"><strong>{request.sender?.name || "Connect user"}</strong><small>Wants to connect with you</small></span>
-                <button type="button" onClick={() => acceptFriendRequest(request._id, request.sender)}>Accept</button>
-                <button type="button" className="request-decline" onClick={() => rejectFriendRequest(request._id)}>Decline</button>
+                <IconButton title="Accept friend request" aria-label="Accept friend request" onClick={() => acceptFriendRequest(request._id, request.sender)}><CheckRounded /></IconButton>
+                <IconButton title="Reject friend request" aria-label="Reject friend request" className="request-decline" onClick={() => rejectFriendRequest(request._id)}><CloseRounded /></IconButton>
               </div>
             )) : <p className="contact-picker-empty">No incoming requests.</p>}
             <h3 className="request-section-title">Sent</h3>
@@ -2417,6 +2646,56 @@ function ChatHome() {
             <header className="contact-picker-header"><div><p className="chat-overline">GROUP INVITE</p><h2 id="group-qr-title">{groupQrTarget.name}</h2><p>Anyone who scans this code can join this group.</p></div><IconButton className="contact-picker-close" aria-label="Close group QR code" onClick={() => setGroupQrTarget(null)}><CloseRounded /></IconButton></header>
             {groupQrImage ? <img className="my-friend-qr" src={groupQrImage} alt={`QR code to join ${groupQrTarget.name}`} /> : <p className="contact-picker-empty">Creating group QR code…</p>}
             <p className="qr-help-text">Open the QR scanner from the left sidebar and scan this invite to join.</p>
+          </section>
+        </div>
+      )}
+      {addPeopleOpen && selecteduser?.isGroup && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAddPeopleOpen(false); }}>
+          <section className="contact-picker group-people-dialog" role="dialog" aria-modal="true" aria-labelledby="group-people-title">
+            <header className="contact-picker-header"><div><p className="chat-overline">{selecteduser.name}</p><h2 id="group-people-title">Add people</h2><p>Add an existing friend, search by phone, or scan a personal QR code.</p></div><IconButton className="contact-picker-close" aria-label="Close add people" onClick={() => setAddPeopleOpen(false)}><CloseRounded /></IconButton></header>
+            <div className="group-add-tabs" role="tablist" aria-label="Add people options">
+              <button type="button" className={addPeopleTab === "friends" ? "active" : ""} onClick={() => setAddPeopleTab("friends")}>Friends</button>
+              <button type="button" className={addPeopleTab === "phone" ? "active" : ""} onClick={() => setAddPeopleTab("phone")}>Phone</button>
+              <button type="button" className={addPeopleTab === "qr" ? "active" : ""} onClick={() => { setGroupQrScanStatus(""); setAddPeopleTab("qr"); }}>QR scan</button>
+            </div>
+            {addPeopleTab === "friends" && <div className="group-add-friend-list">
+              {users.length ? users.map((friend) => {
+                const alreadyInGroup = groupDetails?.members?.some((member) => String(member._id) === String(friend._id));
+                return <div className="group-add-friend-row" key={friend._id}><span className="relative"><Avatar className="group-member-avatar"><AvatarPhoto src={getImageUrl(friend.profileImage)} name={friend.name} /></Avatar>{friend.isOnline && <i className="group-online-dot" />}</span><span className="contact-picker-user"><strong>{friend.name}</strong><small>{alreadyInGroup ? "Already in the group" : "Friend"}</small></span><IconButton title={alreadyInGroup ? "Already in group" : "Add to group"} aria-label={alreadyInGroup ? "Already in group" : `Add ${friend.name} to group`} disabled={alreadyInGroup} onClick={() => void addGroupPerson(friend._id)}><PersonAddAlt1Rounded /></IconButton></div>;
+              }) : <p className="contact-picker-empty">You do not have any friends to add yet.</p>}
+            </div>}
+            {addPeopleTab === "phone" && <>
+              <form className="group-phone-search" onSubmit={searchGroupPerson}><label className="account-phone-label" htmlFor="group-add-phone">Mobile number</label><div><input id="group-add-phone" className="contact-picker-search" type="tel" inputMode="tel" placeholder="Include country code" value={groupPhoneQuery} onChange={(event) => setGroupPhoneQuery(event.target.value)} required /><IconButton type="submit" aria-label="Search mobile number"><SearchRounded /></IconButton></div></form>
+              {groupPhoneResult?.user && <div className="group-add-friend-row"><Avatar className="group-member-avatar"><AvatarPhoto src={getImageUrl(groupPhoneResult.user.profileImage)} name={groupPhoneResult.user.name} /></Avatar><span className="contact-picker-user"><strong>{groupPhoneResult.user.name}</strong><small>{groupPhoneResult.relationship === "friends" ? "Friend" : groupPhoneResult.relationship === "incoming" ? "Friend request received" : groupPhoneResult.relationship === "outgoing" ? "Request pending" : "Not a friend yet"}</small></span>
+                {groupPhoneResult.relationship === "friends" ? <IconButton title="Add friend to group" aria-label="Add friend to group" onClick={() => void addGroupPerson(groupPhoneResult.user._id)}><PersonAddAlt1Rounded /></IconButton> : groupPhoneResult.relationship === "incoming" ? <><IconButton title="Accept request and add to group" aria-label="Accept request and add to group" onClick={async () => { if (await acceptFriendRequest(groupPhoneResult.requestId, groupPhoneResult.user)) await addGroupPerson(groupPhoneResult.user._id); }}><CheckRounded /></IconButton><IconButton title="Reject friend request" aria-label="Reject friend request" onClick={() => void rejectFriendRequest(groupPhoneResult.requestId)}><CloseRounded /></IconButton></> : groupPhoneResult.relationship === "outgoing" ? <IconButton title="Request pending" aria-label="Request pending" disabled><CheckRounded /></IconButton> : <IconButton title="Send friend request" aria-label="Send friend request" onClick={() => void sendFriendRequest(groupPhoneResult.user)}><PersonAddAlt1Rounded /></IconButton>}
+              </div>}
+            </>}
+            {addPeopleTab === "qr" && <><div id="group-add-qr-reader" className="connect-qr-reader" /><p className="qr-help-text">Scan a person’s QR code. Friends are added directly; others receive a friend request.</p>{groupQrScanStatus && <p className="friend-action-error" role="status">{groupQrScanStatus}</p>}</>}
+            {groupPhoneError && <p className="friend-action-error" role="alert">{groupPhoneError}</p>}
+          </section>
+        </div>
+      )}
+      {groupDetailsOpen && selecteduser?.isGroup && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGroupDetailsOpen(false); }}>
+          <section className="contact-picker group-details-dialog" role="dialog" aria-modal="true" aria-labelledby="group-details-title">
+            <header className="contact-picker-header"><div><p className="chat-overline">GROUP DETAILS</p><h2 id="group-details-title">{selecteduser.name}</h2><p>{groupDetails?.memberCount || 0} members · {groupDetails?.onlineCount || 0} online</p></div><IconButton className="contact-picker-close" aria-label="Close group details" onClick={() => setGroupDetailsOpen(false)}><CloseRounded /></IconButton></header>
+            <div className="group-member-list group-member-list-full">{(groupDetails?.members || []).map((member) => <div className="group-member-row" key={member._id}>
+              <button className="group-member-person" type="button" onClick={() => setGroupMemberProfile(member)}><span className="relative"><Avatar className="group-member-avatar"><AvatarPhoto src={getImageUrl(member.profileImage)} name={member.name} /></Avatar>{member.isOnline && <i className="group-online-dot" />}</span><strong>{member.name}</strong></button>
+              {member.isAdmin && <span className="group-admin-badge">Admin</span>}
+              {groupDetails?.isAdmin && !member.isAdmin && <IconButton className="group-remove-button" title="Remove member" aria-label={`Remove ${member.name}`} onClick={() => void removeGroupMember(member)}><CloseRounded /></IconButton>}
+            </div>)}</div>
+            {groupActionError && <p className="friend-action-error" role="alert">{groupActionError}</p>}
+          </section>
+        </div>
+      )}
+      {groupMemberProfile && selecteduser?.isGroup && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGroupMemberProfile(null); }}>
+          <section className="contact-picker group-member-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="group-member-profile-title">
+            <header className="contact-picker-header"><div><p className="chat-overline">GROUP MEMBER</p><h2 id="group-member-profile-title">{groupMemberProfile.name || "Anonymous"}</h2><p>{groupMemberProfile.isAdmin ? "Group admin" : "Member"}</p></div><IconButton className="contact-picker-close" aria-label="Close member profile" onClick={() => setGroupMemberProfile(null)}><CloseRounded /></IconButton></header>
+            <div className="group-member-profile-main"><span className="relative"><Avatar className="group-member-profile-avatar"><AvatarPhoto src={getImageUrl(groupMemberProfile.profileImage)} name={groupMemberProfile.name} /></Avatar>{groupMemberProfile.isOnline && <i className="group-online-dot" />}</span><strong>{groupMemberProfile.name || "Anonymous"}</strong><small>{groupMemberProfile.isAnonymous ? "Profile details are private" : selectedGroupMemberIsFriend ? "Friend" : "Not your friend"}</small>
+              {incomingGroupFriendRequest ? <div className="group-profile-request-actions"><IconButton className="group-profile-add-button" title="Accept friend request" aria-label="Accept friend request" onClick={async () => { await acceptFriendRequest(incomingGroupFriendRequest._id, groupMemberProfile); await refreshGroupDetails(selecteduser._id); }}><CheckRounded /></IconButton><IconButton className="group-profile-reject-button" title="Reject friend request" aria-label="Reject friend request" onClick={() => void rejectFriendRequest(incomingGroupFriendRequest._id)}><CloseRounded /></IconButton></div> : outgoingGroupFriendRequest ? <IconButton className="group-profile-add-button" title="Friend request pending" aria-label="Friend request pending" disabled><CheckRounded /></IconButton> : !selectedGroupMemberIsFriend && <IconButton className="group-profile-add-button" title="Send friend request" aria-label="Send friend request" onClick={async () => { try { const response = await fetch("https://freechat-ydqe.onrender.com/api/friends/requests", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` }, body: JSON.stringify({ userId: groupMemberProfile._id }) }); const data = await response.json(); if (!response.ok) throw new Error(data.message || "Could not send request."); setGroupMemberProfile((current) => ({ ...current, requestSent: true })); await refreshFriendRequests(); } catch (error) { setGroupPhoneError(error.message); } }} disabled={groupMemberProfile.requestSent}><PersonAddAlt1Rounded /></IconButton>}
+              {groupMemberProfile.requestSent && <small>Friend request sent</small>}
+            </div>
           </section>
         </div>
       )}
