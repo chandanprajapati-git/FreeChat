@@ -102,6 +102,12 @@ function AvatarPhoto({ src, name, alt = "", onClick }) {
   );
 }
 
+const FRIEND_SEARCH_API_BASE =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV
+    ? "http://localhost:5000"
+    : "https://freechat-ydqe.onrender.com");
+
 function ChatHome() {
   const navigate = useNavigate();
 
@@ -507,16 +513,17 @@ function ChatHome() {
     setGroupPhoneError("");
     setGroupPhoneResult(null);
     try {
-      const phone = groupPhoneQuery.replace(/\D/g, "");
+      const phone = groupPhoneQuery.trim();
+      if (phone.length < 3) throw new Error("Enter at least 3 characters.");
       const response = await fetch(
-        `https://freechat-ydqe.onrender.com/api/friends/search?phone=${encodeURIComponent(phone)}`,
+        `${FRIEND_SEARCH_API_BASE}/api/friends/search?phone=${encodeURIComponent(phone)}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         },
       );
       const data = await response.json();
       if (!response.ok)
-        throw new Error(data.message || "No account found with that number.");
+        throw new Error(data.message || "No accounts found matching that search.");
       setGroupPhoneResult(data);
     } catch (error) {
       setGroupPhoneError(error.message);
@@ -1065,10 +1072,10 @@ function ChatHome() {
   }, [contactPickerOpen]);
 
   useEffect(() => {
-    const digits = contactQuery.replace(/\D/g, "");
+    const digits = contactQuery.trim();
     setSearchResult(null);
     setFriendActionError("");
-    if (digits.length < 7) {
+    if (digits.length < 3) {
       setSearchingPeople(false);
       return undefined;
     }
@@ -1076,7 +1083,7 @@ function ChatHome() {
     const timeoutId = window.setTimeout(async () => {
       try {
         const response = await fetch(
-          `https://freechat-ydqe.onrender.com/api/friends/search?phone=${encodeURIComponent(digits)}`,
+          `${FRIEND_SEARCH_API_BASE}/api/friends/search?phone=${encodeURIComponent(digits)}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -1086,7 +1093,7 @@ function ChatHome() {
         const result = await response.json();
         if (!response.ok) {
           setSearchResult({
-            error: result.message || "No account found with that number.",
+            error: result.message || "No account found matching that search.",
           });
         } else {
           setSearchResult(result);
@@ -4008,7 +4015,7 @@ function ChatHome() {
                 <p className="chat-overline">CONNECT</p>
                 <h2 id="contact-picker-title">Start a new chat</h2>
                 <p>
-                  Find someone using their mobile number, then send a request.
+                  Search by name or mobile number, then send a friend request.
                 </p>
               </div>
               <IconButton
@@ -4023,15 +4030,14 @@ function ChatHome() {
               className="contact-picker-search-label"
               htmlFor="contact-picker-search"
             >
-              Mobile number
+              Name or mobile number
             </label>
             <input
               id="contact-picker-search"
               className="contact-picker-search"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="Enter mobile number"
+              type="search"
+              autoComplete="off"
+              placeholder="Enter a name or mobile number"
               value={contactQuery}
               onChange={(event) => setContactQuery(event.target.value)}
               style={{
@@ -4047,61 +4053,63 @@ function ChatHome() {
             <div className="contact-picker-list">
               {searchingPeople ? (
                 <p className="contact-picker-empty">
-                  Searching by mobile number…
+                  Searching…
                 </p>
-              ) : searchResult?.user ? (
-                <div className="contact-picker-result">
-                  <span className="contact-picker-avatar">
-                    {searchResult.user.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="contact-picker-user">
-                    <strong>{searchResult.user.name}</strong>
-                    <small>
-                      {searchResult.relationship === "friends"
-                        ? "Already friends"
-                        : "Found by mobile number"}
-                    </small>
-                  </span>
-                  {searchResult.relationship === "friends" ? (
-                    <button
-                      type="button"
-                      onClick={() => openChat(searchResult.user)}
-                    >
-                      Open chat
-                    </button>
-                  ) : searchResult.relationship === "outgoing" ? (
-                    <button type="button" disabled>
-                      Request sent
-                    </button>
-                  ) : searchResult.relationship === "incoming" ? (
-                    <IconButton
-                      title="Accept friend request"
-                      aria-label="Accept friend request"
-                      onClick={() =>
-                        acceptFriendRequest(
-                          searchResult.requestId,
-                          searchResult.user,
-                        )
-                      }
-                    >
-                      <CheckRounded />
-                    </IconButton>
-                  ) : (
-                    <IconButton
-                      title="Send friend request"
-                      aria-label="Send friend request"
-                      onClick={() => sendFriendRequest(searchResult.user)}
-                    >
-                      <PersonAddAlt1Rounded />
-                    </IconButton>
-                  )}
-                </div>
+              ) : searchResult?.results?.length > 0 ? (
+                searchResult.results.map((res, idx) => (
+                  <div key={idx} className="contact-picker-result mb-2">
+                    <Avatar className="contact-picker-avatar">
+                      <AvatarPhoto src={getImageUrl(res.user.profileImage)} name={res.user.name} />
+                    </Avatar>
+                    <span className="contact-picker-user">
+                      <strong>{res.user.name}</strong>
+                      <small>
+                        {res.relationship === "friends"
+                          ? "Already friends"
+                          : "Found by search"}
+                      </small>
+                    </span>
+                    {res.relationship === "friends" ? (
+                      <button
+                        type="button"
+                        onClick={() => openChat(res.user)}
+                      >
+                        Open chat
+                      </button>
+                    ) : res.relationship === "outgoing" ? (
+                      <button type="button" disabled>
+                        Request sent
+                      </button>
+                    ) : res.relationship === "incoming" ? (
+                      <IconButton
+                        title="Accept friend request"
+                        aria-label="Accept friend request"
+                        onClick={() =>
+                          acceptFriendRequest(
+                            res.requestId,
+                            res.user,
+                          )
+                        }
+                      >
+                        <CheckRounded />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        title="Send friend request"
+                        aria-label="Send friend request"
+                        onClick={() => sendFriendRequest(res.user)}
+                      >
+                        <PersonAddAlt1Rounded />
+                      </IconButton>
+                    )}
+                  </div>
+                ))
               ) : (
                 <p className="contact-picker-empty">
                   {searchResult?.error ||
-                    (contactQuery.replace(/\D/g, "").length < 7
-                      ? "Find someone by mobile number."
-                      : "No account found with that mobile number.")}
+                    (contactQuery.trim().length < 3
+                      ? "Search by name or number."
+                      : "No account found.")}
                 </p>
               )}
             </div>
@@ -4566,41 +4574,41 @@ function ChatHome() {
                     </button>
                   </div>
                 </form>
-                {groupPhoneResult?.user && (
-                  <div className="group-add-friend-row">
+                {groupPhoneResult?.results && groupPhoneResult.results.map((res, idx) => (
+                  <div key={idx} className="group-add-friend-row mb-2">
                     <Avatar className="group-member-avatar">
                       <AvatarPhoto
-                        src={getImageUrl(groupPhoneResult.user.profileImage)}
-                        name={groupPhoneResult.user.name}
+                        src={getImageUrl(res.user.profileImage)}
+                        name={res.user.name}
                         onClick={() =>
-                          groupPhoneResult.user._id !== currentUserId &&
-                          setProfileViewerData(groupPhoneResult.user)
+                          res.user._id !== currentUserId &&
+                          setProfileViewerData(res.user)
                         }
                       />
                     </Avatar>
                     <span className="contact-picker-user">
-                      <strong>{groupPhoneResult.user.name}</strong>
+                      <strong>{res.user.name}</strong>
                       <small>
-                        {groupPhoneResult.relationship === "friends"
+                        {res.relationship === "friends"
                           ? "Friend"
-                          : groupPhoneResult.relationship === "incoming"
+                          : res.relationship === "incoming"
                             ? "Friend request received"
-                            : groupPhoneResult.relationship === "outgoing"
+                            : res.relationship === "outgoing"
                               ? "Request pending"
                               : "Not a friend yet"}
                       </small>
                     </span>
-                    {groupPhoneResult.relationship === "friends" ? (
+                    {res.relationship === "friends" ? (
                       <IconButton
                         title="Add friend to group"
                         aria-label="Add friend to group"
                         onClick={() =>
-                          void addGroupPerson(groupPhoneResult.user._id)
+                          void addGroupPerson(res.user._id)
                         }
                       >
                         <PersonAddAlt1Rounded />
                       </IconButton>
-                    ) : groupPhoneResult.relationship === "incoming" ? (
+                    ) : res.relationship === "incoming" ? (
                       <>
                         <IconButton
                           title="Accept request and add to group"
@@ -4608,11 +4616,11 @@ function ChatHome() {
                           onClick={async () => {
                             if (
                               await acceptFriendRequest(
-                                groupPhoneResult.requestId,
-                                groupPhoneResult.user,
+                                res.requestId,
+                                res.user,
                               )
                             )
-                              await addGroupPerson(groupPhoneResult.user._id);
+                              await addGroupPerson(res.user._id);
                           }}
                         >
                           <CheckRounded />
@@ -4621,13 +4629,13 @@ function ChatHome() {
                           title="Reject friend request"
                           aria-label="Reject friend request"
                           onClick={() =>
-                            void rejectFriendRequest(groupPhoneResult.requestId)
+                            void rejectFriendRequest(res.requestId)
                           }
                         >
                           <CloseRounded />
                         </IconButton>
                       </>
-                    ) : groupPhoneResult.relationship === "outgoing" ? (
+                    ) : res.relationship === "outgoing" ? (
                       <IconButton
                         title="Request pending"
                         aria-label="Request pending"
@@ -4640,14 +4648,14 @@ function ChatHome() {
                         title="Send friend request"
                         aria-label="Send friend request"
                         onClick={() =>
-                          void sendFriendRequest(groupPhoneResult.user)
+                          void sendFriendRequest(res.user)
                         }
                       >
                         <PersonAddAlt1Rounded />
                       </IconButton>
                     )}
                   </div>
-                )}
+                ))}
               </>
             )}
             {groupPhoneError && (

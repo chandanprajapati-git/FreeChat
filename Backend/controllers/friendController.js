@@ -14,25 +14,42 @@ const privacySafeUser = (value) => {
 
 const searchByPhone = async (req, res) => {
   try {
-    const phone = String(req.query.phone || "").replace(/\D/g, "");
-    if (phone.length < 7 || phone.length > 15) {
-      return res.status(400).json({ message: "Enter a valid mobile number." });
+    const q = String(req.query.phone || "").trim();
+    if (q.length < 3) {
+      return res.status(400).json({ message: "Enter at least 3 characters to search." });
     }
-    const user = await User.findOne({ phone, _id: { $ne: req.user } }).select(userSummary);
-    if (!user) return res.status(404).json({ message: "No account was found with that mobile number." });
+    
+    const isPhone = /^[+\d\s().-]+$/.test(q);
+    const phoneDigits = q.replace(/\D/g, "");
+
+    let query;
+    if (isPhone && phoneDigits.length >= 7) {
+       query = { phone: phoneDigits, _id: { $ne: req.user } };
+    } else {
+       const escapedName = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+       query = { name: { $regex: new RegExp(escapedName, "i") }, _id: { $ne: req.user } };
+    }
+
+    const users = await User.find(query).select(userSummary).limit(10);
+    if (users.length === 0) return res.status(404).json({ message: "No accounts found matching that search." });
 
     const self = await User.findById(req.user).select("friends");
-    let relationship = self?.friends?.some((id) => String(id) === String(user._id)) ? "friends" : "none";
-    let requestId = null;
-    if (relationship === "none") {
-      const [outgoing, incoming] = await Promise.all([
-        FriendRequest.findOne({ sender: req.user, recipient: user._id, status: "pending" }).select("_id"),
-        FriendRequest.findOne({ sender: user._id, recipient: req.user, status: "pending" }).select("_id"),
-      ]);
-      if (outgoing) relationship = "outgoing";
-      else if (incoming) { relationship = "incoming"; requestId = incoming._id; }
-    }
-    res.json({ user: privacySafeUser(user), relationship, requestId });
+    
+    const results = await Promise.all(users.map(async (user) => {
+        let relationship = self?.friends?.some((id) => String(id) === String(user._id)) ? "friends" : "none";
+        let requestId = null;
+        if (relationship === "none") {
+          const [outgoing, incoming] = await Promise.all([
+            FriendRequest.findOne({ sender: req.user, recipient: user._id, status: "pending" }).select("_id"),
+            FriendRequest.findOne({ sender: user._id, recipient: req.user, status: "pending" }).select("_id"),
+          ]);
+          if (outgoing) relationship = "outgoing";
+          else if (incoming) { relationship = "incoming"; requestId = incoming._id; }
+        }
+        return { user: privacySafeUser(user), relationship, requestId };
+    }));
+    
+    res.json({ results });
   } catch (error) {
     res.status(500).json({ message: "Could not search for that person." });
   }
