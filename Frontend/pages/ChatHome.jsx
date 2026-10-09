@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
+import Profile from "../profile/Profile";
 import Avatar from "@mui/material/Avatar";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
@@ -2726,10 +2727,9 @@ function ChatHome() {
                           members
                         </p>
                       ) : (
-                        !selecteduser.isAnonymous &&
-                        selecteduser.status && (
-                          <p className="chat-header-status">
-                            {selecteduser.status}
+                        !selecteduser.isAnonymous && (
+                          <p className="chat-header-status text-[13px] text-gray-400">
+                            {selecteduser.isOnline ? "Online" : selecteduser.lastSeen ? `Last seen ${new Date(selecteduser.lastSeen).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : selecteduser.status || "Offline"}
                           </p>
                         )
                       )}
@@ -4199,136 +4199,26 @@ function ChatHome() {
           </section>
         </div>
       )}
-      {phoneDialogOpen && (
-        <div
-          className="contact-picker-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setPhoneDialogOpen(false);
-          }}
-        >
-          <section
-            className="contact-picker phone-setup-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="phone-setup-title"
-          >
-            <header className="contact-picker-header">
-              <div>
-                <p className="chat-overline">ACCOUNT</p>
-                <h2 id="phone-setup-title">Account settings</h2>
-                <p>Manage your photo, status, visibility, and mobile number.</p>
-              </div>
-              <IconButton
-                className="contact-picker-close"
-                aria-label="Close account settings"
-                onClick={() => setPhoneDialogOpen(false)}
-              >
-                <CloseRounded />
-              </IconButton>
-            </header>
-            <div className="account-photo-setting">
-              <Avatar className="account-photo-avatar">
-                <AvatarPhoto
-                  src={getImageUrl(myProfileImage)}
-                  name={profileName}
-                  alt="My profile"
-                />
-              </Avatar>
-              <div className="account-photo-copy">
-                <strong>Profile picture</strong>
-                <span>Choose and adjust how your photo appears.</span>
-              </div>
-              <button
-                type="button"
-                className="account-photo-change"
-                onClick={() =>
-                  document.getElementById("profile-image-input")?.click()
-                }
-              >
-                Change
-              </button>
-            </div>
-            <label className="privacy-switch-row">
-              <span>
-                <strong>Show my profile</strong>
-                <small>
-                  When off, friends see “Anonymous” with no photo, status, or
-                  profile details.
-                </small>
-              </span>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={!isAnonymous}
-                onChange={saveProfileVisibility}
-                disabled={savingPrivacy}
-              />
-            </label>
-            <form className="account-status-form" onSubmit={saveProfileStatus}>
-              <label className="account-phone-label" htmlFor="account-status">
-                Status
-              </label>
-              <textarea
-                id="account-status"
-                className="contact-picker-search account-status-input"
-                maxLength={160}
-                rows={3}
-                placeholder="Share a short status with your friends"
-                value={statusDraft}
-                onChange={(event) => setStatusDraft(event.target.value)}
-              />
-              <div className="account-status-footer">
-                <small>
-                  {myStatus
-                    ? `Current status: ${myStatus.length} characters`
-                    : ""}{" "}
-                  · {statusDraft.length}/160
-                </small>
-                <button
-                  className="phone-save-button"
-                  type="submit"
-                  disabled={savingStatus}
-                >
-                  {savingStatus ? "Saving…" : "Save status"}
-                </button>
-              </div>
-              {statusError && (
-                <p className="friend-action-error" role="alert">
-                  {statusError}
-                </p>
-              )}
-            </form>
-            {phoneError && (
-              <p className="friend-action-error" role="alert">
-                {phoneError}
-              </p>
-            )}
-            <form onSubmit={savePhoneNumber}>
-              <label
-                className="account-phone-label"
-                htmlFor="account-phone-number"
-              >
-                Mobile number
-              </label>
-              <input
-                id="account-phone-number"
-                className="contact-picker-search phone-number-input"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="Include your country code"
-                value={phoneDraft}
-                onChange={(event) => setPhoneDraft(event.target.value)}
-                required
-              />
-              <button className="phone-save-button" type="submit">
-                Save
-              </button>
-            </form>
-          </section>
-        </div>
-      )}
+      <Profile
+        open={phoneDialogOpen}
+        onClose={() => setPhoneDialogOpen(false)}
+        myProfileImage={getImageUrl(myProfileImage)}
+        profileName={profileName}
+        onChangePhoto={() => document.getElementById("profile-image-input")?.click()}
+        isAnonymous={isAnonymous}
+        saveProfileVisibility={saveProfileVisibility}
+        savingPrivacy={savingPrivacy}
+        saveProfileStatus={saveProfileStatus}
+        statusDraft={statusDraft}
+        setStatusDraft={setStatusDraft}
+        myStatus={myStatus}
+        savingStatus={savingStatus}
+        statusError={statusError}
+        phoneError={phoneError}
+        savePhoneNumber={savePhoneNumber}
+        phoneDraft={phoneDraft}
+        setPhoneDraft={setPhoneDraft}
+      />
       {groupDialogOpen && (
         <div
           className="contact-picker-backdrop"
@@ -5310,3 +5200,6 @@ function ChatHome() {
 }
 
 export default ChatHome;
+
+
+
