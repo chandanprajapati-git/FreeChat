@@ -1213,6 +1213,14 @@
 .account-status-footer small { color: rgba(255,255,255,.58); font-size: 10px; line-height: 1.4; }
 .account-status-footer .phone-save-button { flex: 0 0 auto; width: auto; margin: 0; padding: 0 13px; }
 .chat-header-status { max-width: min(50vw, 380px); margin: 3px 0 0; overflow: hidden; color: rgba(255,255,255,.58); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.contact-picker input.phone-number-input,
+.contact-picker input.phone-number-input:focus,
+.contact-picker .group-phone-search input.phone-number-input { color: #fff !important; -webkit-text-fill-color: #fff !important; caret-color: #fff !important; opacity: 1 !important; background-color: rgba(255,255,255,.12) !important; font-size: 15px; font-weight: 650; text-shadow: none !important; }
+.contact-picker input.phone-number-input::placeholder { color: rgba(255,255,255,.72) !important; -webkit-text-fill-color: rgba(255,255,255,.72) !important; opacity: 1 !important; }
+.contact-picker input.phone-number-input::selection { color: #fff; background: #73518d; }
+.contact-picker input.phone-number-input:-webkit-autofill,
+.contact-picker input.phone-number-input:-webkit-autofill:hover,
+.contact-picker input.phone-number-input:-webkit-autofill:focus { -webkit-text-fill-color: #fff !important; -webkit-box-shadow: 0 0 0 1000px #26222c inset !important; caret-color: #fff !important; }
 .group-edit-icon-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.12); border-bottom: 1px solid rgba(255,255,255,.12); }
 .group-edit-icon { width: 48px !important; height: 48px !important; flex: 0 0 48px; color: #e0c5f2; background: rgba(255,255,255,.12); }
 .group-edit-icon-copy { display: grid; flex: 1; min-width: 0; gap: 4px; }

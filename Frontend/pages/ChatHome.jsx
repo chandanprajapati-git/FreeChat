@@ -2005,12 +2005,12 @@ function ChatHome() {
                   </div>
                   {selecteduser.isGroup ? (
                     <div className="group-menu-wrap">
+                      <Tooltip title="Group voice call"><IconButton className="chat-call-button group-audio-call-button" aria-label="Start group voice call" onClick={() => startGroupCall("audio")}><CallRounded /></IconButton></Tooltip>
                       <Tooltip title="Group video call"><IconButton className="chat-call-button group-video-call-button" aria-label="Start group video call" onClick={() => startGroupCall("video")}><VideocamRounded /></IconButton></Tooltip>
                       <Tooltip title="Group options"><IconButton className="chat-call-button" aria-label="Group options" aria-expanded={groupMenuOpen} onClick={() => setGroupMenuOpen((open) => !open)}><MoreVertRounded /></IconButton></Tooltip>
                       {groupMenuOpen && <div className="group-header-menu" role="menu" aria-label="Group options">
                         <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); setAddPeopleTab("phone"); setGroupPhoneError(""); setGroupPhoneResult(null); setAddPeopleOpen(true); }}><PersonAddAlt1Rounded />Add people</button>
                         <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); setGroupQrTarget(selecteduser); }}><QrCodeRounded />Show group QR</button>
-                        <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); startGroupCall("audio"); }}><CallRounded />Voice call</button>
                         {groupDetails?.isAdmin && <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); setGroupEditName(selecteduser.name); setGroupEditDescription(groupDetails?.description || selecteduser.description || ""); setGroupIconFile(null); setGroupActionError(""); setGroupEditOpen(true); }}><EditRounded />Edit group details</button>}
                         <button type="button" role="menuitem" onClick={() => { setGroupMenuOpen(false); setGroupDetailsOpen(true); void refreshGroupDetails(selecteduser._id); }}><GroupRounded />Group details</button>
                         <button type="button" role="menuitem" onClick={() => void clearGroupChat()}><CloseRounded />Clear chat</button>
@@ -2734,7 +2734,7 @@ function ChatHome() {
             {phoneError && <p className="friend-action-error" role="alert">{phoneError}</p>}
             <form onSubmit={savePhoneNumber}>
               <label className="account-phone-label" htmlFor="account-phone-number">Mobile number</label>
-              <input id="account-phone-number" className="contact-picker-search" type="tel" inputMode="tel" autoComplete="tel" placeholder="Include your country code" value={phoneDraft} onChange={(event) => setPhoneDraft(event.target.value)} required />
+              <input id="account-phone-number" className="contact-picker-search phone-number-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="Include your country code" value={phoneDraft} onChange={(event) => setPhoneDraft(event.target.value)} required />
               <button className="phone-save-button" type="submit">Save mobile number</button>
             </form>
           </section>
@@ -2786,7 +2786,7 @@ function ChatHome() {
               }) : <p className="contact-picker-empty">You do not have any friends to add yet.</p>}
             </div>}
             {addPeopleTab === "phone" && <>
-              <form className="group-phone-search" onSubmit={searchGroupPerson}><label className="account-phone-label" htmlFor="group-add-phone">Search by mobile number</label><div><input id="group-add-phone" className="contact-picker-search" type="tel" inputMode="tel" autoComplete="tel" placeholder="e.g. +1 555 123 4567" value={groupPhoneQuery} onChange={(event) => setGroupPhoneQuery(event.target.value)} required /><button className="group-phone-submit" type="submit"><SearchRounded /><span>Search</span></button></div></form>
+              <form className="group-phone-search" onSubmit={searchGroupPerson}><label className="account-phone-label" htmlFor="group-add-phone">Search by mobile number</label><div><input id="group-add-phone" className="contact-picker-search phone-number-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="e.g. +1 555 123 4567" value={groupPhoneQuery} onChange={(event) => setGroupPhoneQuery(event.target.value)} required /><button className="group-phone-submit" type="submit"><SearchRounded /><span>Search</span></button></div></form>
               {groupPhoneResult?.user && <div className="group-add-friend-row"><Avatar className="group-member-avatar"><AvatarPhoto src={getImageUrl(groupPhoneResult.user.profileImage)} name={groupPhoneResult.user.name} /></Avatar><span className="contact-picker-user"><strong>{groupPhoneResult.user.name}</strong><small>{groupPhoneResult.relationship === "friends" ? "Friend" : groupPhoneResult.relationship === "incoming" ? "Friend request received" : groupPhoneResult.relationship === "outgoing" ? "Request pending" : "Not a friend yet"}</small></span>
                 {groupPhoneResult.relationship === "friends" ? <IconButton title="Add friend to group" aria-label="Add friend to group" onClick={() => void addGroupPerson(groupPhoneResult.user._id)}><PersonAddAlt1Rounded /></IconButton> : groupPhoneResult.relationship === "incoming" ? <><IconButton title="Accept request and add to group" aria-label="Accept request and add to group" onClick={async () => { if (await acceptFriendRequest(groupPhoneResult.requestId, groupPhoneResult.user)) await addGroupPerson(groupPhoneResult.user._id); }}><CheckRounded /></IconButton><IconButton title="Reject friend request" aria-label="Reject friend request" onClick={() => void rejectFriendRequest(groupPhoneResult.requestId)}><CloseRounded /></IconButton></> : groupPhoneResult.relationship === "outgoing" ? <IconButton title="Request pending" aria-label="Request pending" disabled><CheckRounded /></IconButton> : <IconButton title="Send friend request" aria-label="Send friend request" onClick={() => void sendFriendRequest(groupPhoneResult.user)}><PersonAddAlt1Rounded /></IconButton>}
               </div>}
