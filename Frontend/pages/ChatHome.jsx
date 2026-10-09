@@ -243,6 +243,7 @@ function ChatHome() {
     if (!imagePath) return "";
     const backendOrigin = "https://freechat-ydqe.onrender.com";
     const normalizedPath = String(imagePath).trim().replaceAll("\\", "/");
+    if (normalizedPath.startsWith("data:")) return normalizedPath;
     if (/^https?:\/\//i.test(normalizedPath)) {
       try {
         const parsedUrl = new URL(normalizedPath);

@@ -126,7 +126,7 @@ const uploadProfileImage = async (req, res) => {
       });
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const imageUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
 
     const user = await User.findByIdAndUpdate(
       req.user,
