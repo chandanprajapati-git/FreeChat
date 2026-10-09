@@ -52,12 +52,21 @@ function MessageTicks({ status }) {
 
 function AvatarPhoto({ src, name, alt = "" }) {
   const [failedSrc, setFailedSrc] = useState("");
+  const [retry, setRetry] = useState({ src: "", url: "" });
   if (!src || failedSrc === src) return <span aria-hidden="true">{name?.trim()?.charAt(0)?.toUpperCase() || "?"}</span>;
+  const imageSrc = retry.src === src ? retry.url : src;
   return (
     <img
-      src={src}
+      src={imageSrc}
       alt={alt}
-      onError={() => setFailedSrc(src)}
+      onError={() => {
+        if (retry.src !== src) {
+          const separator = src.includes("?") ? "&" : "?";
+          setRetry({ src, url: `${src}${separator}avatarRetry=1` });
+        } else {
+          setFailedSrc(src);
+        }
+      }}
       style={{ width: "100%", height: "100%", objectFit: "cover" }}
     />
   );
@@ -129,15 +138,24 @@ function ChatHome() {
 
   const getImageUrl = (imagePath) => {
     if (!imagePath) return "";
-
-    if (imagePath.startsWith("http")) {
-      return imagePath;
+    const backendOrigin = "https://freechat-ydqe.onrender.com";
+    const normalizedPath = String(imagePath).trim().replaceAll("\\", "/");
+    if (/^https?:\/\//i.test(normalizedPath)) {
+      try {
+        const parsedUrl = new URL(normalizedPath);
+        if (parsedUrl.pathname.includes("/uploads/")) {
+          return `${backendOrigin}${parsedUrl.pathname}${parsedUrl.search}`;
+        }
+        return normalizedPath.replace(/^http:\/\//i, "https://");
+      } catch {
+        return normalizedPath;
+      }
     }
-
-    return `https://freechat-ydqe.onrender.com${imagePath}`;
+    return `${backendOrigin}${normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`}`;
   };
 
   const messagesEndRef = useRef(null);
+  const smoothScrollNextRef = useRef(false);
   const documentInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const audioInputRef = useRef(null);
@@ -367,7 +385,10 @@ function ChatHome() {
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const behavior = smoothScrollNextRef.current && !reduceMotion ? "smooth" : "auto";
+    smoothScrollNextRef.current = false;
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
   }, [messages.length, selectedUserId]);
 
   useEffect(() => {
@@ -802,6 +823,7 @@ function ChatHome() {
         setComposerError(data.message || "Could not send this message.");
         return;
       }
+      smoothScrollNextRef.current = true;
       setmessages((prevMessages) => [...prevMessages, data.data]);
       setnewMessage("");
       emitTypingUpdate(selecteduser._id, "");
@@ -1217,6 +1239,7 @@ function ChatHome() {
       if (senderId === String(currentUserId)) {
         const receiverId = String(data.receiver?._id || data.receiver);
         if (receiverId === String(selectedUserId)) {
+          smoothScrollNextRef.current = true;
           setmessages((prevMessages) => prevMessages.some((message) => message._id === data._id) ? prevMessages : [...prevMessages, data]);
         }
         return;
@@ -1232,6 +1255,7 @@ function ChatHome() {
 
       setUnreadCounts((counts) => ({ ...counts, [senderId]: 0 }));
       socket.emit("messageRead", { messageId: data._id });
+      smoothScrollNextRef.current = true;
       setmessages((prevMessages) => [...prevMessages, data]);
     });
 
@@ -1850,6 +1874,7 @@ function ChatHome() {
                   <div className="chat-composer-input-wrap flex-1 relative">
                     <input
                       type="text"
+                      enterKeyHint="send"
                       maxLength={1000}
                       placeholder="Write a message..."
                       aria-label="Write a message"
@@ -1861,7 +1886,7 @@ function ChatHome() {
                         emitTypingUpdate(selecteduser._id, text);
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                           e.preventDefault();
                           sendMessage();
                         }
@@ -2113,13 +2138,13 @@ function ChatHome() {
             <input
               id="contact-picker-search"
               className="contact-picker-search"
-              type="search"
+              type="tel"
               inputMode="tel"
               autoComplete="tel"
               placeholder="Enter mobile number, including country code"
-              inputMode="tel"
               value={contactQuery}
               onChange={(event) => setContactQuery(event.target.value)}
+              style={{ color: "#fff", WebkitTextFillColor: "#fff", caretColor: "#fff", backgroundColor: "rgba(255,255,255,.12)", fontWeight: 600, opacity: 1 }}
               autoFocus
             />
             <div className="contact-picker-list">
