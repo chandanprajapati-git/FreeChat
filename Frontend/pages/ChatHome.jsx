@@ -2447,7 +2447,7 @@ function ChatHome() {
                   {selecteduser.isGroup ? <>
                     <section className="group-description-panel" aria-label="Group description"><h3>Group description</h3><p>{groupDetails?.description || selecteduser.description || "No description has been added."}</p></section>
                     <div className="group-details-heading"><div><h3>Group members</h3><small>{groupDetails?.memberCount || selecteduser.members?.length || 1} people · {groupDetails?.onlineCount || 0} online</small></div><div><button type="button" onClick={() => setGroupDetailsOpen(true)}>View all</button>{groupDetails?.isAdmin && <button type="button" onClick={() => { setGroupEditName(selecteduser.name); setGroupEditDescription(groupDetails?.description || selecteduser.description || ""); setGroupIconFile(null); setGroupActionError(""); setGroupEditOpen(true); }}>Edit group</button>}</div></div>
-                    {groupDetails?.isAdmin && <p className="group-role-help">One Leader, up to 7 Co-leaders, and unlimited Elders and Members.</p>}
+                    {groupDetails?.isAdmin && <p className="group-role-help"></p>}
                     <div className="group-member-list">
                       {(groupDetails?.members || []).slice(0, 6).map((member) => <div className="group-member-row" key={member._id}>
                         <button className="group-member-person" type="button" onClick={() => setGroupMemberProfile(member)}>
@@ -2639,7 +2639,7 @@ function ChatHome() {
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              placeholder="Enter mobile number, including country code"
+              placeholder="Enter mobile number"
               value={contactQuery}
               onChange={(event) => setContactQuery(event.target.value)}
               style={{ color: "#fff", WebkitTextFillColor: "#fff", caretColor: "#fff", backgroundColor: "rgba(255,255,255,.12)", fontWeight: 600, opacity: 1 }}
@@ -2668,7 +2668,7 @@ function ChatHome() {
               ) : (
                 <p className="contact-picker-empty">
                   {searchResult?.error || (contactQuery.replace(/\D/g, "").length < 7
-                    ? "Enter at least 7 digits to find someone by mobile number."
+                    ? "Find someone by mobile number."
                     : "No account found with that mobile number.")}
                 </p>
               )}
@@ -2728,14 +2728,14 @@ function ChatHome() {
             <form className="account-status-form" onSubmit={saveProfileStatus}>
               <label className="account-phone-label" htmlFor="account-status">Status</label>
               <textarea id="account-status" className="contact-picker-search account-status-input" maxLength={160} rows={3} placeholder="Share a short status with your friends" value={statusDraft} onChange={(event) => setStatusDraft(event.target.value)} />
-              <div className="account-status-footer"><small>{myStatus ? `Current status: ${myStatus.length} characters` : "Visible beneath your name in one-to-one chats"} · {statusDraft.length}/160</small><button className="phone-save-button" type="submit" disabled={savingStatus}>{savingStatus ? "Saving…" : "Save status"}</button></div>
+              <div className="account-status-footer"><small>{myStatus ? `Current status: ${myStatus.length} characters` : ""} · {statusDraft.length}/160</small><button className="phone-save-button" type="submit" disabled={savingStatus}>{savingStatus ? "Saving…" : "Save status"}</button></div>
               {statusError && <p className="friend-action-error" role="alert">{statusError}</p>}
             </form>
             {phoneError && <p className="friend-action-error" role="alert">{phoneError}</p>}
             <form onSubmit={savePhoneNumber}>
               <label className="account-phone-label" htmlFor="account-phone-number">Mobile number</label>
               <input id="account-phone-number" className="contact-picker-search phone-number-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="Include your country code" value={phoneDraft} onChange={(event) => setPhoneDraft(event.target.value)} required />
-              <button className="phone-save-button" type="submit">Save mobile number</button>
+              <button className="phone-save-button" type="submit">Save</button>
             </form>
           </section>
         </div>
@@ -2786,7 +2786,7 @@ function ChatHome() {
               }) : <p className="contact-picker-empty">You do not have any friends to add yet.</p>}
             </div>}
             {addPeopleTab === "phone" && <>
-              <form className="group-phone-search" onSubmit={searchGroupPerson}><label className="account-phone-label" htmlFor="group-add-phone">Search by mobile number</label><div><input id="group-add-phone" className="contact-picker-search phone-number-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="e.g. +1 555 123 4567" value={groupPhoneQuery} onChange={(event) => setGroupPhoneQuery(event.target.value)} required /><button className="group-phone-submit" type="submit"><SearchRounded /><span>Search</span></button></div></form>
+              <form className="group-phone-search" onSubmit={searchGroupPerson}><label className="account-phone-label" htmlFor="group-add-phone">Search by mobile number</label><div><input id="group-add-phone" className="contact-picker-search phone-number-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="123456789" value={groupPhoneQuery} onChange={(event) => setGroupPhoneQuery(event.target.value)} required /><button className="group-phone-submit" type="submit"><SearchRounded /><span>Search</span></button></div></form>
               {groupPhoneResult?.user && <div className="group-add-friend-row"><Avatar className="group-member-avatar"><AvatarPhoto src={getImageUrl(groupPhoneResult.user.profileImage)} name={groupPhoneResult.user.name} /></Avatar><span className="contact-picker-user"><strong>{groupPhoneResult.user.name}</strong><small>{groupPhoneResult.relationship === "friends" ? "Friend" : groupPhoneResult.relationship === "incoming" ? "Friend request received" : groupPhoneResult.relationship === "outgoing" ? "Request pending" : "Not a friend yet"}</small></span>
                 {groupPhoneResult.relationship === "friends" ? <IconButton title="Add friend to group" aria-label="Add friend to group" onClick={() => void addGroupPerson(groupPhoneResult.user._id)}><PersonAddAlt1Rounded /></IconButton> : groupPhoneResult.relationship === "incoming" ? <><IconButton title="Accept request and add to group" aria-label="Accept request and add to group" onClick={async () => { if (await acceptFriendRequest(groupPhoneResult.requestId, groupPhoneResult.user)) await addGroupPerson(groupPhoneResult.user._id); }}><CheckRounded /></IconButton><IconButton title="Reject friend request" aria-label="Reject friend request" onClick={() => void rejectFriendRequest(groupPhoneResult.requestId)}><CloseRounded /></IconButton></> : groupPhoneResult.relationship === "outgoing" ? <IconButton title="Request pending" aria-label="Request pending" disabled><CheckRounded /></IconButton> : <IconButton title="Send friend request" aria-label="Send friend request" onClick={() => void sendFriendRequest(groupPhoneResult.user)}><PersonAddAlt1Rounded /></IconButton>}
               </div>}
@@ -2801,7 +2801,7 @@ function ChatHome() {
             <header className="contact-picker-header"><div><p className="chat-overline">GROUP DETAILS</p><h2 id="group-details-title">{selecteduser.name}</h2><p>{groupDetails?.memberCount || 0} members · {groupDetails?.onlineCount || 0} online</p></div><IconButton className="contact-picker-close" aria-label="Close group details" onClick={() => setGroupDetailsOpen(false)}><CloseRounded /></IconButton></header>
             <div className="group-member-list group-member-list-full">{(groupDetails?.members || []).map((member) => <div className="group-member-row" key={member._id}>
               <button className="group-member-person" type="button" onClick={() => setGroupMemberProfile(member)}><span className="relative"><Avatar className="group-member-avatar"><AvatarPhoto src={getImageUrl(member.profileImage)} name={member.name} /></Avatar>{member.isOnline && <i className="group-online-dot" />}</span><strong>{member.name}</strong></button>
-              {member._id === String(groupDetails?.creator) ? <span className="group-admin-badge">Leader</span> : groupDetails?.isAdmin ? <select className="group-role-select" aria-label={`Role for ${member.name}`} value={member.role || "Member"} onChange={(event) => void updateGroupMemberRole(member, event.target.value)}><option>Member</option><option>Elder</option><option disabled={groupCoLeaderCount >= 7 && member.role !== "Co-leader"}>Co-leader</option>{String(groupDetails?.creator) === String(currentUserId) && <option>Leader</option>}</select> : <span className={member.isAdmin ? "group-admin-badge" : "group-role-badge"}>{member.role || "Member"}</span>}
+              {member._id === String(groupDetails?.creator) ? <span className="group-admin-badge">Leader</span> : groupDetails?.isAdmin ? <select className="group-role-select" aria-label={`Role for ${member.name}`} value={member.role || "Member"} onChange={(event) => void updateGroupMemberRole(member, event.target.value)}><option><b>Member</b></option><option>Elder</option><option disabled={groupCoLeaderCount >= 7 && member.role !== "Co-leader"}><b>Co-leader</b></option>{String(groupDetails?.creator) === String(currentUserId) && <option>Leader</option>}</select> : <span className={member.isAdmin ? "group-admin-badge" : "group-role-badge"}>{member.role || "Member"}</span>}
               {groupDetails?.isAdmin && !member.isAdmin && <IconButton className="group-remove-button" title="Remove member" aria-label={`Remove ${member.name}`} onClick={() => void removeGroupMember(member)}><CloseRounded /></IconButton>}
             </div>)}</div>
             {groupActionError && <p className="friend-action-error" role="alert">{groupActionError}</p>}

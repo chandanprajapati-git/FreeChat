@@ -20,7 +20,7 @@ export function Icon({ name, size = 20, ...props }) {
 }
 
 export function Brand({ className = '' }) {
-  return <Link to="/" className={`brand ${className}`} aria-label="Connect home"><span className="brand-mark"><ForumRounded className="brand-icon-default"/><ForumOutlined className="brand-icon-hover"/></span><span className="brand-name">Connect</span></Link>;
+  return <Link to="/" className={`brand ${className}`} aria-label="Connect home"><span className="brand-mark"><ForumRounded className="brand-icon-default"/><ForumOutlined className="brand-icon-hover"/></span><span className="brand-name">Connect.I/O</span></Link>;
 }
 
 export function AuthShell({ children, signup = false }) {

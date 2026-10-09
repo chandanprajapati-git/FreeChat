@@ -41,7 +41,7 @@ function Login() {
     <header className="auth-heading"><p className="auth-kicker">Welcome back</p><h2>Catch up with your people.</h2><p>Your conversations are right where you left them.</p></header>
     <form className="auth-form" onSubmit={handleLogin}>
       {location.state?.notice && <div className="auth-notice" role="status">{location.state.notice}</div>}
-      <AuthField id="email" label="Email address" icon="mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"/>
+      <AuthField id="email" label="Email address" icon="mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" autoComplete="email"/>
       <AuthField id="password" label="Password" icon="lock" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" action={<PasswordAction visible={showPassword} onClick={() => setShowPassword(!showPassword)}/>}/>
       {error && <div className="auth-error" role="alert">{error}</div>}
       <Button className="auth-submit" variant="contained" type="submit" disabled={loading} endIcon={!loading && <Icon name="arrow" size={18}/>}>{loading ? 'Signing you in…' : 'Sign in'}</Button>
