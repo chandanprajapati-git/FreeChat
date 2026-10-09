@@ -3,7 +3,14 @@ const User = require("../models/User");
 const FriendRequest = require("../models/FriendRequest");
 const onlineUsers = require("../socket/socketManager");
 
-const userSummary = "name profileImage isOnline lastSeen";
+const userSummary = "name profileImage isAnonymous isOnline lastSeen";
+
+const privacySafeUser = (value) => {
+  if (!value) return value;
+  const user = value.toObject ? value.toObject() : { ...value };
+  if (!user.isAnonymous) return user;
+  return { ...user, name: "Anonymous", email: "", profileImage: "", isOnline: false, lastSeen: null };
+};
 
 const searchByPhone = async (req, res) => {
   try {
@@ -25,7 +32,7 @@ const searchByPhone = async (req, res) => {
       if (outgoing) relationship = "outgoing";
       else if (incoming) { relationship = "incoming"; requestId = incoming._id; }
     }
-    res.json({ user, relationship, requestId });
+    res.json({ user: privacySafeUser(user), relationship, requestId });
   } catch (error) {
     res.status(500).json({ message: "Could not search for that person." });
   }
@@ -37,7 +44,10 @@ const getRequests = async (req, res) => {
       FriendRequest.find({ recipient: req.user, status: "pending" }).populate("sender", userSummary).sort({ createdAt: -1 }),
       FriendRequest.find({ sender: req.user, status: "pending" }).populate("recipient", userSummary).sort({ createdAt: -1 }),
     ]);
-    res.json({ incoming, outgoing });
+    res.json({
+      incoming: incoming.map((request) => ({ ...request.toObject(), sender: privacySafeUser(request.sender) })),
+      outgoing: outgoing.map((request) => ({ ...request.toObject(), recipient: privacySafeUser(request.recipient) })),
+    });
   } catch (error) {
     res.status(500).json({ message: "Could not load friend requests." });
   }
@@ -49,8 +59,8 @@ const sendRequest = async (req, res) => {
     if (!mongoose.isValidObjectId(recipientId) || recipientId === String(req.user)) {
       return res.status(400).json({ message: "Choose a valid person." });
     }
-    const recipient = await User.findById(recipientId).select("name profileImage isOnline lastSeen friends");
-    const sender = await User.findById(req.user).select("name profileImage");
+    const recipient = await User.findById(recipientId).select("name profileImage isAnonymous isOnline lastSeen friends");
+    const sender = await User.findById(req.user).select("name profileImage isAnonymous");
     if (!recipient || !sender) return res.status(404).json({ message: "User not found." });
     if (recipient.friends.some((id) => String(id) === String(req.user))) {
       return res.status(409).json({ message: "You are already friends." });
@@ -69,7 +79,7 @@ const sendRequest = async (req, res) => {
     if (recipientSocket) {
       req.app.get("io").to(recipientSocket).emit("friendRequestReceived", {
         requestId: request._id,
-        sender,
+        sender: privacySafeUser(sender),
       });
     }
     res.status(201).json({ message: "Friend request sent." });
@@ -95,7 +105,7 @@ const acceptRequest = async (req, res) => {
     if (senderSocket) {
       req.app.get("io").to(senderSocket).emit("friendRequestUpdated", { status: "accepted" });
     }
-    res.json({ message: "Friend request accepted.", friend: request.recipient });
+    res.json({ message: "Friend request accepted.", friend: privacySafeUser(request.recipient) });
   } catch (error) {
     res.status(500).json({ message: "Could not accept this request." });
   }

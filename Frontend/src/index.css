@@ -1136,6 +1136,29 @@
 .qr-generation-state { display: grid; justify-items: center; gap: 8px; }
 .qr-generation-state button { padding: 8px 13px; border: 1px solid rgba(255,255,255,.2); border-radius: 9px; color: #fff; background: rgba(255,255,255,.1); cursor: pointer; }
 .photo-crop-dialog { align-items: center; gap: 4px; }
+.account-photo-setting { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid rgba(89, 63, 107, .12); border-bottom: 1px solid rgba(89, 63, 107, .12); }
+.account-photo-avatar { width: 46px !important; height: 46px !important; flex: 0 0 46px; color: #40235a; background: linear-gradient(145deg,#ffe2bf,#eaa8bb); font-size: 16px; font-weight: 800; }
+.account-photo-copy { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.account-photo-copy strong, .privacy-switch-row strong, .account-phone-label { color: #302638; font-size: 13px; font-weight: 750; }
+.account-photo-copy span, .privacy-switch-row small { color: #898091; font-size: 11px; line-height: 1.45; }
+.account-photo-change { flex: 0 0 auto; border: 0; border-radius: 9px; padding: 8px 11px; color: #563070; background: #f1e9f8; font-size: 12px; font-weight: 750; cursor: pointer; }
+.privacy-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 0; cursor: pointer; }
+.privacy-switch-row > span { display: grid; gap: 4px; }
+.privacy-switch-row input { appearance: none; position: relative; flex: 0 0 44px; width: 44px; height: 25px; margin: 0; border-radius: 999px; background: #c8c1ce; cursor: pointer; transition: background .18s ease; }
+.privacy-switch-row input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: white; box-shadow: 0 1px 3px #24172b33; transition: transform .18s ease; }
+.privacy-switch-row input:checked { background: #684184; }
+.privacy-switch-row input:checked::after { transform: translateX(19px); }
+.privacy-switch-row input:disabled { opacity: .6; cursor: wait; }
+.account-phone-label { display: block; margin: 4px 0 7px; }
+.anonymous-profile-note { max-width: 260px; margin: 10px 0; color: #898091; font-size: 12px; line-height: 1.5; }
+.group-create-dialog form { display: flex; flex-direction: column; }
+.group-create-dialog .phone-save-button { margin-top: 4px; }
+.group-qr-button { flex: 0 0 auto; margin-left: 8px; }
+.group-message-author { display: block; margin: 0 0 4px; color: #a8d7ff; font-size: 10px; font-weight: 750; }
+.phone-setup-panel { gap: 0; }
+.phone-setup-panel .contact-picker-header { margin-bottom: 14px; }
+.phone-setup-panel form { margin-top: 2px; }
+.phone-setup-panel .phone-save-button { margin-top: 10px; }
 .photo-crop-dialog .contact-picker-header { width: 100%; align-self: stretch; }
 .photo-crop-preview { position: relative; flex: 0 0 auto; overflow: hidden; border: 3px solid rgba(255,255,255,.85); border-radius: 50%; background: #15191f; box-shadow: 0 8px 28px rgba(0,0,0,.28); }
 .photo-crop-preview img { position: absolute; max-width: none; max-height: none; object-fit: fill; user-select: none; pointer-events: none; }

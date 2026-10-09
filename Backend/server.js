@@ -10,6 +10,7 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const friendRoutes = require("./routes/friendRoutes");
+const groupRoutes = require("./routes/groupRoutes");
 const onlineUsers = require("./socket/socketManager");
 const Message = require("./models/message");
 const User = require("./models/User");
@@ -55,6 +56,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/friends", friendRoutes);
+app.use("/api/groups", groupRoutes);
 
 app.get("/", (req, res) => {
   res.send("Backend is Running");
@@ -94,13 +96,14 @@ io.on("connection", (socket) => {
 
       onlineUsers.set(authenticatedUserId, socket.id);
 
-      await User.findByIdAndUpdate(authenticatedUserId, {
+      const registeredUser = await User.findByIdAndUpdate(authenticatedUserId, {
         isOnline: true,
-      });
+      }, { new: true }).select("isAnonymous");
 
       io.emit("presenceUpdate", {
         userId: authenticatedUserId,
-        isOnline: true,
+        isOnline: !registeredUser?.isAnonymous,
+        isAnonymous: Boolean(registeredUser?.isAnonymous),
       });
 
       console.log("User is online");
@@ -126,6 +129,16 @@ io.on("connection", (socket) => {
       }
     } catch (error) {
       console.log("Typing event error:", error.message);
+    }
+  });
+  socket.on("group:join", async ({ groupId } = {}) => {
+    try {
+      if (!socket.userId || !groupId) return;
+      const Group = require("./models/Group");
+      const isMember = await Group.exists({ _id: groupId, members: socket.userId });
+      if (isMember) socket.join(`group:${groupId}`);
+    } catch (error) {
+      console.log("Group room join error:", error.message);
     }
   });
   socket.on("messageDelivered", async (data) => {
@@ -197,15 +210,16 @@ io.on("connection", (socket) => {
       if (socket.userId && onlineUsers.get(socket.userId) === socket.id) {
         onlineUsers.delete(socket.userId);
 
-        await User.findByIdAndUpdate(socket.userId, {
+        const disconnectedUser = await User.findByIdAndUpdate(socket.userId, {
           isOnline: false,
           lastSeen: new Date(),
-        });
+        }, { new: true }).select("isAnonymous");
 
         io.emit("presenceUpdate", {
           userId: socket.userId,
           isOnline: false,
-          lastSeen: new Date().toISOString(),
+          ...(disconnectedUser?.isAnonymous ? {} : { lastSeen: new Date().toISOString() }),
+          isAnonymous: Boolean(disconnectedUser?.isAnonymous),
         });
 
         console.log("User is offline");

@@ -6,10 +6,13 @@ const getUsers= async (req,res)=>{
     const users = currentUser?.friends?.length
       ? await User.find(
         { _id: { $in: currentUser.friends } },
-        "name email profileImage isOnline lastSeen",
+        "name email profileImage isAnonymous isOnline lastSeen",
       )
       : [];
-    res.status(200).json(users);
+    res.status(200).json(users.map((user) => {
+      if (!user.isAnonymous) return user;
+      return { ...user.toObject(), name: "Anonymous", email: "", profileImage: "", isOnline: false, lastSeen: null };
+    }));
   } 
   catch(error){
     res.status(500).json({
@@ -23,7 +26,7 @@ const getMyProfile = async (req, res) => {
   try {
     const user = await User.findById(
       req.user,
-      "name email phone profileImage isOnline lastSeen"
+      "name email phone profileImage isAnonymous isOnline lastSeen"
     );
 
     if (!user) {
@@ -39,6 +42,40 @@ const getMyProfile = async (req, res) => {
       message: "Server error",
       error: error.message
     });
+  }
+};
+
+const updatePrivacy = async (req, res) => {
+  if (typeof req.body.isAnonymous !== "boolean") {
+    return res.status(400).json({ message: "Choose whether your profile is visible." });
+  }
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user,
+      { isAnonymous: req.body.isAnonymous },
+      { new: true },
+    ).select("name email phone profileImage isAnonymous isOnline lastSeen friends");
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const hidden = user.isAnonymous;
+    const payload = {
+      userId: String(user._id),
+      isAnonymous: hidden,
+      name: hidden ? "Anonymous" : user.name,
+      email: hidden ? "" : user.email,
+      profileImage: hidden ? "" : user.profileImage,
+      isOnline: hidden ? false : user.isOnline,
+      lastSeen: hidden ? null : user.lastSeen,
+    };
+    const io = req.app.get("io");
+    const onlineUsers = require("../socket/socketManager");
+    for (const friendId of user.friends) {
+      const socketId = onlineUsers.get(String(friendId));
+      if (socketId) io.to(socketId).emit("profilePrivacyChanged", payload);
+    }
+    res.json({ message: "Profile visibility updated.", user: { isAnonymous: hidden } });
+  } catch (error) {
+    res.status(500).json({ message: "Could not update profile visibility." });
   }
 };
 
@@ -95,4 +132,4 @@ const uploadProfileImage = async (req, res) => {
     });
   }
 };
-module.exports={getUsers,getMyProfile,uploadProfileImage,updateMyPhone}
+module.exports={getUsers,getMyProfile,uploadProfileImage,updateMyPhone,updatePrivacy}

@@ -24,6 +24,10 @@ const userSchema=new mongoose.Schema({
       type:String,
       default:""
     },
+  isAnonymous:{
+    type:Boolean,
+    default:false
+  },
   isOnline:{
     type:Boolean,
     default:false

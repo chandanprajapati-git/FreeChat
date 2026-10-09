@@ -8,6 +8,7 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import ForumRounded from "@mui/icons-material/ForumRounded";
 import GroupAddRounded from "@mui/icons-material/GroupAddRounded";
+import GroupRounded from "@mui/icons-material/GroupRounded";
 import LogoutRounded from "@mui/icons-material/LogoutRounded";
 import EditRounded from "@mui/icons-material/EditRounded";
 import AddCircleOutlineRounded from "@mui/icons-material/AddCircleOutlineRounded";
@@ -85,6 +86,7 @@ function ChatHome() {
   });
 
   const [users, setusers] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [profileName, setProfileName] = useState(
     () => localStorage.getItem("profileName") || "My account",
   );
@@ -99,6 +101,11 @@ function ChatHome() {
   const [qrTab, setQrTab] = useState("scan");
   const [myQrImage, setMyQrImage] = useState("");
   const [qrGenerationAttempt, setQrGenerationAttempt] = useState(0);
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupNameDraft, setGroupNameDraft] = useState("");
+  const [groupActionError, setGroupActionError] = useState("");
+  const [groupQrTarget, setGroupQrTarget] = useState(null);
+  const [groupQrImage, setGroupQrImage] = useState("");
   const [qrScanStatus, setQrScanStatus] = useState("");
   const [qrRequestSending, setQrRequestSending] = useState(false);
   const [requestPanelOpen, setRequestPanelOpen] = useState(false);
@@ -121,6 +128,8 @@ function ChatHome() {
   const [profileImageError, setProfileImageError] = useState("");
   const [savingProfileImage, setSavingProfileImage] = useState(false);
   const [myProfileImage, setMyProfileImage] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [myPhone, setMyPhone] = useState("");
   const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
   const [phoneDraft, setPhoneDraft] = useState("");
@@ -220,6 +229,45 @@ function ChatHome() {
     setContactQuery("");
   };
 
+  const refreshGroups = async () => {
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/groups", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setGroups(data);
+      setselecteduser((current) => current?.isGroup
+        ? data.find((group) => String(group._id) === String(current._id))
+          ? { ...data.find((group) => String(group._id) === String(current._id)), isGroup: true }
+          : null
+        : current);
+    } catch {
+      // Retry on the next refresh.
+    }
+  };
+
+  const createGroup = async (event) => {
+    event.preventDefault();
+    setGroupActionError("");
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ name: groupNameDraft }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not create group.");
+      const group = { ...data.group, isGroup: true };
+      setGroups((current) => [data.group, ...current.filter((item) => item._id !== data.group._id)]);
+      setGroupNameDraft("");
+      setGroupDialogOpen(false);
+      openChat(group);
+    } catch (error) {
+      setGroupActionError(error.message);
+    }
+  };
+
   const refreshFriendContacts = async () => {
     try {
       const response = await fetch("https://freechat-ydqe.onrender.com/api/users", {
@@ -229,7 +277,7 @@ function ChatHome() {
       const contacts = await response.json();
       setusers(contacts);
       setselecteduser((current) => current
-        ? contacts.find((user) => String(user._id) === String(current._id)) || null
+        ? current.isGroup ? current : contacts.find((user) => String(user._id) === String(current._id)) || null
         : null);
     } catch {
       // The regular contact refresh will retry if the server is temporarily unavailable.
@@ -269,6 +317,30 @@ function ChatHome() {
     }
   };
 
+  const saveProfileVisibility = async (event) => {
+    const nextAnonymous = !event.target.checked;
+    setPhoneError("");
+    setSavingPrivacy(true);
+    try {
+      const response = await fetch("https://freechat-ydqe.onrender.com/api/users/privacy", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ isAnonymous: nextAnonymous }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not update profile visibility.");
+      setIsAnonymous(nextAnonymous);
+      await refreshFriendRequests();
+    } catch (error) {
+      setPhoneError(error.message);
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
   const sendFriendRequest = async (user) => {
     setFriendActionError("");
     try {
@@ -291,6 +363,29 @@ function ChatHome() {
 
   const handleScannedQr = async (decodedText) => {
     if (qrScanHandledRef.current || qrRequestSending) return;
+    const groupMatch = String(decodedText || "").trim().match(/^connectgroup:([a-f\d]{24})$/i);
+    if (groupMatch) {
+      qrScanHandledRef.current = true;
+      setQrRequestSending(true);
+      setQrScanStatus("Joining group…");
+      try {
+        const response = await fetch(`https://freechat-ydqe.onrender.com/api/groups/${groupMatch[1]}/join`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Could not join this group.");
+        await refreshGroups();
+        setQrScanStatus(`Joined ${data.group.name}.`);
+        openChat({ ...data.group, isGroup: true });
+      } catch (error) {
+        qrScanHandledRef.current = false;
+        setQrScanStatus(error.message || "Could not join group.");
+      } finally {
+        setQrRequestSending(false);
+      }
+      return;
+    }
     const match = String(decodedText || "").trim().match(/^connectchat:([a-f\d]{24})$/i);
     if (!match) {
       setQrScanStatus("This QR code is not a Connect friend code.");
@@ -325,6 +420,26 @@ function ChatHome() {
       setQrRequestSending(false);
     }
   };
+
+  useEffect(() => {
+    refreshGroups();
+    const interval = window.setInterval(refreshGroups, 15000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!socket || !groups.length) return;
+    groups.forEach((group) => socket.emit("group:join", { groupId: group._id }));
+  }, [socket, groups]);
+
+  useEffect(() => {
+    let active = true;
+    if (!groupQrTarget) { setGroupQrImage(""); return () => { active = false; }; }
+    import("qrcode").then(({ default: QRCode }) => QRCode.toDataURL(`connectgroup:${groupQrTarget._id}`, {
+      width: 280, margin: 2, color: { dark: "#172033", light: "#ffffff" }, errorCorrectionLevel: "M",
+    })).then((image) => { if (active) setGroupQrImage(image); }).catch(() => { if (active) setGroupQrImage(""); });
+    return () => { active = false; };
+  }, [groupQrTarget]);
 
   const acceptFriendRequest = async (requestId, friend) => {
     setFriendActionError("");
@@ -512,11 +627,11 @@ function ChatHome() {
         }
         if (!isActive) return;
         setusers(data);
-        setselecteduser((currentUser) =>
-          currentUser
-            ? data.find((user) => user._id === currentUser._id) || null
-            : currentUser,
-        );
+        setselecteduser((currentUser) => currentUser
+          ? currentUser.isGroup
+            ? currentUser
+            : data.find((user) => user._id === currentUser._id) || null
+          : currentUser);
       } catch (error) {
         console.log(error);
       }
@@ -533,11 +648,16 @@ function ChatHome() {
 
   useEffect(() => {
     if (!socket) return undefined;
-    const onPresenceUpdate = ({ userId, isOnline, lastSeen }) => {
+    const onPresenceUpdate = ({ userId, isOnline, lastSeen, isAnonymous }) => {
       const normalizedUserId = String(userId);
       const updatePresence = (user) =>
         String(user._id) === normalizedUserId
-          ? { ...user, isOnline, ...(lastSeen ? { lastSeen } : {}) }
+          ? {
+              ...user,
+              ...(isAnonymous ? { name: "Anonymous", email: "", profileImage: "", isAnonymous: true, lastSeen: null } : {}),
+              isOnline: isAnonymous ? false : isOnline,
+              ...(lastSeen && !isAnonymous ? { lastSeen } : {}),
+            }
           : user;
 
       setusers((currentUsers) => currentUsers.map(updatePresence));
@@ -546,8 +666,20 @@ function ChatHome() {
       );
     };
 
+    const onProfilePrivacyChanged = (profile) => {
+      const updateProfile = (user) => String(user._id) === String(profile.userId)
+        ? { ...user, ...profile }
+        : user;
+      setusers((currentUsers) => currentUsers.map(updateProfile));
+      setselecteduser((currentUser) => currentUser ? updateProfile(currentUser) : currentUser);
+    };
+
     socket.on("presenceUpdate", onPresenceUpdate);
-    return () => socket.off("presenceUpdate", onPresenceUpdate);
+    socket.on("profilePrivacyChanged", onProfilePrivacyChanged);
+    return () => {
+      socket.off("presenceUpdate", onPresenceUpdate);
+      socket.off("profilePrivacyChanged", onProfilePrivacyChanged);
+    };
   }, [socket]);
 
   useEffect(() => {
@@ -563,8 +695,9 @@ function ChatHome() {
 
   useEffect(() => {
     if (!socket || !selectedUserId) return undefined;
+    if (selecteduser?.isGroup) return undefined;
     return () => emitTypingUpdate(selectedUserId, "");
-  }, [socket, selectedUserId]);
+  }, [socket, selectedUserId, selecteduser?.isGroup]);
 
   useEffect(() => {
     const fetchMyProfile = async () => {
@@ -589,6 +722,7 @@ function ChatHome() {
         }
 
         setMyProfileImage(data.profileImage || "");
+        setIsAnonymous(Boolean(data.isAnonymous));
         setMyPhone(data.phone || "");
         setPhoneDraft(data.phone || "");
         if (data.name) {
@@ -611,7 +745,7 @@ function ChatHome() {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `https://freechat-ydqe.onrender.com/api/messages/${selectedUserId}`,
+          `https://freechat-ydqe.onrender.com/api/messages/${selecteduser?.isGroup ? `group/${selectedUserId}` : selectedUserId}`,
           {
             method: "GET",
             headers: {
@@ -627,7 +761,7 @@ function ChatHome() {
         setmessages(data);
         setUnreadCounts((counts) => ({ ...counts, [selectedUserId]: 0 }));
         if (socket) {
-          data.forEach((message) => {
+      if (!selecteduser?.isGroup) data.forEach((message) => {
             const senderId = String(message.sender?._id || message.sender);
             if (
               senderId === String(selectedUserId) &&
@@ -642,7 +776,7 @@ function ChatHome() {
       }
     };
     fetchMessages();
-  }, [selectedUserId, socket]);
+  }, [selectedUserId, socket, selecteduser?.isGroup]);
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -800,12 +934,12 @@ function ChatHome() {
       setComposerError("");
       const token = localStorage.getItem("token");
       const body = file ? new FormData() : JSON.stringify({
-        receiverId: selecteduser._id,
+        ...(selecteduser.isGroup ? { groupId: selecteduser._id } : { receiverId: selecteduser._id }),
         message: text,
         replyTo: replyingTo?._id || null,
       });
       if (file) {
-        body.append("receiverId", selecteduser._id);
+        body.append(selecteduser.isGroup ? "groupId" : "receiverId", selecteduser._id);
         body.append("message", text);
         body.append("replyTo", replyingTo?._id || "");
         body.append("file", file);
@@ -824,9 +958,9 @@ function ChatHome() {
         return;
       }
       smoothScrollNextRef.current = true;
-      setmessages((prevMessages) => [...prevMessages, data.data]);
+      setmessages((prevMessages) => prevMessages.some((item) => String(item._id) === String(data.data._id)) ? prevMessages : [...prevMessages, data.data]);
       setnewMessage("");
-      emitTypingUpdate(selecteduser._id, "");
+      if (!selecteduser.isGroup) emitTypingUpdate(selecteduser._id, "");
       setReplyingTo(null);
     } catch (error) {
       setComposerError(error.message || "Could not send this message. Check your connection and try again.");
@@ -1225,6 +1359,7 @@ function ChatHome() {
 
     newSocket.on("connect", () => {
       newSocket.emit("register", decoded.userId);
+      groups.forEach((group) => newSocket.emit("group:join", { groupId: group._id }));
     });
 
     return () => {
@@ -1259,6 +1394,18 @@ function ChatHome() {
       setmessages((prevMessages) => [...prevMessages, data]);
     });
 
+    const onGroupMessage = (data) => {
+      const groupId = String(data.group?._id || data.group);
+      if (String(selectedUserIdRef.current) === groupId) {
+        smoothScrollNextRef.current = true;
+        setmessages((current) => current.some((item) => String(item._id) === String(data._id)) ? current : [...current, data]);
+      } else {
+        if (String(data.sender?._id || data.sender) === String(currentUserId)) return;
+        setUnreadCounts((current) => ({ ...current, [groupId]: (current[groupId] || 0) + 1 }));
+      }
+    };
+    socket.on("groupMessage", onGroupMessage);
+
     socket.on("messageDeleted", (data) => {
       setmessages((prevMessages) =>
         prevMessages.filter((msg) => msg._id !== data.messageId),
@@ -1285,6 +1432,7 @@ function ChatHome() {
 
     return () => {
       socket.off("receiveMessage");
+      socket.off("groupMessage", onGroupMessage);
       socket.off("messageStatusUpdated");
     };
   }, [socket, selectedUserId, currentUserId]);
@@ -1413,6 +1561,11 @@ function ChatHome() {
                 <GroupAddRounded />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Create a group" placement="right">
+              <IconButton className="rail-button" aria-label="Create a group" onClick={() => { setGroupActionError(""); setGroupDialogOpen(true); }}>
+                <GroupRounded />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Scan a friend QR code" placement="right">
               <IconButton className="rail-button" aria-label="Scan or show a QR code" onClick={() => { setQrScanStatus(""); setQrTab("scan"); setQrToolsOpen(true); }}>
                 <QrCodeScannerRounded />
@@ -1470,6 +1623,14 @@ function ChatHome() {
             </div>
 
             <div className="chat-contact-list flex-1 overflow-y-auto">
+              {groups.map((group) => (
+                <div key={`group-${group._id}`} onClick={() => openChat({ ...group, isGroup: true })}
+                  className={`chat-contact-item flex items-center gap-3 p-2 rounded-lg cursor-pointer ${selecteduser?._id === group._id ? "chat-contact-active" : "chat-contact-hover"}`}>
+                  <Avatar className="contact-avatar w-10 h-10 rounded-full flex items-center justify-center font-medium"><GroupRounded /></Avatar>
+                  <div className="flex-1 min-w-0"><h3 className="font-medium text-[15px] truncate">{group.name}</h3><p className="contact-email text-[13px] truncate">Group · {group.members?.length || 1} members</p></div>
+                  {unreadCounts[group._id] > 0 && <span className="contact-unread-badge">{unreadCounts[group._id] > 99 ? "99+" : unreadCounts[group._id]}</span>}
+                </div>
+              ))}
               {visibleUsers.map((user) => (
                 <div
                   key={user._id}
@@ -1512,7 +1673,7 @@ function ChatHome() {
                   </div>
                 </div>
               ))}
-              {!visibleUsers.length && (
+              {!visibleUsers.length && !groups.length && (
                 <p className="no-contacts">No contacts found.</p>
               )}
             </div>
@@ -1537,9 +1698,9 @@ function ChatHome() {
                   <div className="chat-header-person flex items-center gap-3">
                     <div className="relative">
                       <Avatar className="contact-avatar w-10 h-10 rounded-full flex items-center justify-center font-medium">
-                        <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />
+                        {selecteduser.isGroup ? <GroupRounded /> : <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />}
                       </Avatar>
-                      {selecteduser.isOnline && (
+                      {!selecteduser.isGroup && selecteduser.isOnline && (
                         <span className="contact-status-dot"></span>
                       )}
                     </div>
@@ -1550,11 +1711,15 @@ function ChatHome() {
                       <p
                         className={`chat-presence ${selecteduser.isOnline ? "online" : ""}`}
                       >
-                        {selecteduser.isOnline ? "Online now" : "Offline"}
+                        {selecteduser.isGroup ? `${selecteduser.members?.length || 1} members` : selecteduser.isOnline ? "Online now" : "Offline"}
                       </p>
                     </div>
                   </div>
-                  <div className="chat-call-actions" aria-label="Call options">
+                  {selecteduser.isGroup ? (
+                    <Tooltip title="Show group QR code">
+                      <IconButton className="chat-call-button group-qr-button" aria-label="Show group QR code" onClick={() => setGroupQrTarget(selecteduser)}><QrCodeRounded /></IconButton>
+                    </Tooltip>
+                  ) : <div className="chat-call-actions" aria-label="Call options">
                     <Tooltip title="Voice call">
                       <IconButton
                         className="chat-call-button"
@@ -1573,7 +1738,7 @@ function ChatHome() {
                         <VideocamRounded />
                       </IconButton>
                     </Tooltip>
-                  </div>
+                  </div>}
                 </header>
                 {callNotice && (
                   <div className="call-notice" role="status">
@@ -1616,7 +1781,7 @@ function ChatHome() {
                             <div className="w-7 h-7 flex-shrink-0 mr-2 self-end mb-1">
                               {showAvatar && (
                                 <div className="contact-avatar w-full h-full rounded-full flex items-center justify-center text-[10px] font-medium">
-                                  <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />
+                                  {selecteduser.isGroup ? <GroupRounded /> : <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />}
                                 </div>
                               )}
                             </div>
@@ -1629,6 +1794,9 @@ function ChatHome() {
                                 : "chat-bubble-incoming rounded-[18px] px-3.5 py-2"
                             }`}
                           >
+                            {selecteduser.isGroup && !isSentByMe && (
+                              <small className="group-message-author">{msg.sender?.name || "Group member"}</small>
+                            )}
                             {msg.kind === "call" ? (
                               <div className="call-history-message">
                                 <span className="call-history-icon" aria-hidden="true">{msg.call?.type === "video" ? "▣" : "☎"}</span>
@@ -1883,7 +2051,7 @@ function ChatHome() {
                       onChange={(event) => {
                         const text = event.target.value;
                         setnewMessage(text);
-                        emitTypingUpdate(selecteduser._id, text);
+                        if (!selecteduser.isGroup) emitTypingUpdate(selecteduser._id, text);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -1944,23 +2112,21 @@ function ChatHome() {
                         height: 150,
                       }}
                     >
-                      <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />
+                      {selecteduser.isGroup ? <GroupRounded /> : <AvatarPhoto src={getImageUrl(selecteduser.profileImage)} name={selecteduser.name} />}
                     </Avatar>
-                    {selecteduser.isOnline && (
+                    {!selecteduser.isGroup && selecteduser.isOnline && (
                       <span className="contact-status-dot profile-status-dot"></span>
                     )}
                   </div>
                   <h2 className="text-lg font-medium">{selecteduser.name}</h2>
-                  <p className="profile-presence">
-                    {selecteduser.isOnline ? "Online now" : "Offline"}
-                  </p>
+                  <p className="profile-presence">{selecteduser.isGroup ? `${selecteduser.members?.length || 1} members` : selecteduser.isOnline ? "Online now" : "Offline"}</p>
                 </div>
                 <div className="profile-details">
-                  <h3>Contact details</h3>
-                  <div className="profile-detail-row">
+                  {selecteduser.isGroup ? <><h3>Group chat</h3><p className="anonymous-profile-note">Share the QR code in the chat header to invite anyone to join.</p></> : <><h3>Contact details</h3>{!selecteduser.isAnonymous && <div className="profile-detail-row">
                     <span>Email address</span>
                     <strong>{selecteduser.email}</strong>
-                  </div>
+                  </div>}
+                  {selecteduser.isAnonymous && <p className="anonymous-profile-note">This person chose to keep their profile private.</p>}
                   <div className="profile-detail-row">
                     <span>Availability</span>
                     <strong>
@@ -1970,6 +2136,7 @@ function ChatHome() {
                   <button className="unfriend-button" type="button" onClick={() => unfriend(selecteduser)}>
                     Remove friend
                   </button>
+                  </>}
                 </div>
               </div>
             ) : (
@@ -2215,14 +2382,41 @@ function ChatHome() {
         }}>
           <section className="contact-picker phone-setup-panel" role="dialog" aria-modal="true" aria-labelledby="phone-setup-title">
             <header className="contact-picker-header">
-              <div><p className="chat-overline">ACCOUNT</p><h2 id="phone-setup-title">Mobile number</h2><p>Friends can find you using this number.</p></div>
-              <IconButton className="contact-picker-close" aria-label="Close mobile number settings" onClick={() => setPhoneDialogOpen(false)}><CloseRounded /></IconButton>
+              <div><p className="chat-overline">ACCOUNT</p><h2 id="phone-setup-title">Account settings</h2><p>Manage your photo, visibility, and mobile number.</p></div>
+              <IconButton className="contact-picker-close" aria-label="Close account settings" onClick={() => setPhoneDialogOpen(false)}><CloseRounded /></IconButton>
             </header>
+            <div className="account-photo-setting">
+              <Avatar className="account-photo-avatar"><AvatarPhoto src={getImageUrl(myProfileImage)} name={profileName} alt="My profile" /></Avatar>
+              <div className="account-photo-copy"><strong>Profile picture</strong><span>Choose and adjust how your photo appears.</span></div>
+              <button type="button" className="account-photo-change" onClick={() => document.getElementById("profile-image-input")?.click()}>Change</button>
+            </div>
+            <label className="privacy-switch-row">
+              <span><strong>Show my profile</strong><small>When off, friends see “Anonymous” with no photo or profile details.</small></span>
+              <input type="checkbox" role="switch" checked={!isAnonymous} onChange={saveProfileVisibility} disabled={savingPrivacy} />
+            </label>
+            {phoneError && <p className="friend-action-error" role="alert">{phoneError}</p>}
             <form onSubmit={savePhoneNumber}>
-              <input className="contact-picker-search" type="tel" inputMode="tel" autoComplete="tel" placeholder="Include your country code" value={phoneDraft} onChange={(event) => setPhoneDraft(event.target.value)} required />
-              {phoneError && <p className="friend-action-error" role="alert">{phoneError}</p>}
+              <label className="account-phone-label" htmlFor="account-phone-number">Mobile number</label>
+              <input id="account-phone-number" className="contact-picker-search" type="tel" inputMode="tel" autoComplete="tel" placeholder="Include your country code" value={phoneDraft} onChange={(event) => setPhoneDraft(event.target.value)} required />
               <button className="phone-save-button" type="submit">Save mobile number</button>
             </form>
+          </section>
+        </div>
+      )}
+      {groupDialogOpen && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGroupDialogOpen(false); }}>
+          <section className="contact-picker group-create-dialog" role="dialog" aria-modal="true" aria-labelledby="group-create-title">
+            <header className="contact-picker-header"><div><p className="chat-overline">NEW GROUP</p><h2 id="group-create-title">Create a group</h2><p>Give your group a name. Share its QR code so anyone can join.</p></div><IconButton className="contact-picker-close" aria-label="Close group creation" onClick={() => setGroupDialogOpen(false)}><CloseRounded /></IconButton></header>
+            <form onSubmit={createGroup}><label className="account-phone-label" htmlFor="group-name-input">Group name</label><input id="group-name-input" className="contact-picker-search" autoFocus maxLength={60} placeholder="For example, Weekend plans" value={groupNameDraft} onChange={(event) => setGroupNameDraft(event.target.value)} required />{groupActionError && <p className="friend-action-error" role="alert">{groupActionError}</p>}<button className="phone-save-button" type="submit">Create group</button></form>
+          </section>
+        </div>
+      )}
+      {groupQrTarget && (
+        <div className="contact-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGroupQrTarget(null); }}>
+          <section className="contact-picker qr-dialog" role="dialog" aria-modal="true" aria-labelledby="group-qr-title">
+            <header className="contact-picker-header"><div><p className="chat-overline">GROUP INVITE</p><h2 id="group-qr-title">{groupQrTarget.name}</h2><p>Anyone who scans this code can join this group.</p></div><IconButton className="contact-picker-close" aria-label="Close group QR code" onClick={() => setGroupQrTarget(null)}><CloseRounded /></IconButton></header>
+            {groupQrImage ? <img className="my-friend-qr" src={groupQrImage} alt={`QR code to join ${groupQrTarget.name}`} /> : <p className="contact-picker-empty">Creating group QR code…</p>}
+            <p className="qr-help-text">Open the QR scanner from the left sidebar and scan this invite to join.</p>
           </section>
         </div>
       )}

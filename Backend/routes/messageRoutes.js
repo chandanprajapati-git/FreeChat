@@ -1,6 +1,6 @@
 const express=require("express");
 const router=express.Router();
-const {sendMessage,deleteMessage, editMessage,getMessages}= require("../controllers/messagecontroller")
+const {sendMessage,deleteMessage, editMessage,getMessages,getGroupMessages}= require("../controllers/messagecontroller")
 const protect= require("../middlewares/authMiddleware")
 const upload = require("../middlewares/messageUploadMiddleware");
 
@@ -20,6 +20,7 @@ const receiveMessageFile = (req, res, next) => {
 
 
 router.post("/",protect,receiveMessageFile,sendMessage);
+router.get("/group/:groupId", protect, getGroupMessages);
 router.get("/:userId",protect,getMessages)
 router.delete("/:messageId", protect, deleteMessage);
 router.put("/:messageId", protect, editMessage);
