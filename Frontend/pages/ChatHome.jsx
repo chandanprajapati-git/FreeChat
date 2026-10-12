@@ -1952,6 +1952,7 @@ function ChatHome() {
       socket.emit("call:offer", {
         toUserId: activeCall.peerUserId,
         callId: activeCall.callId,
+        
         callType,
         offer: peerConnection.localDescription,
       });
