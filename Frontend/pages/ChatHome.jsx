@@ -1952,7 +1952,7 @@ function ChatHome() {
       socket.emit("call:offer", {
         toUserId: activeCall.peerUserId,
         callId: activeCall.callId,
-        
+        // working on video call on other device
         callType,
         offer: peerConnection.localDescription,
       });
